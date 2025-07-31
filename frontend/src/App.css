@@ -1,0 +1,58 @@
+.App {
+  text-align: center;
+}
+
+.App-header {
+  background-color: #282c34;
+  padding: 20px;
+  color: white;
+}
+
+/* Animations for bilateral stimulation */
+@keyframes bilateral-horizontal {
+  0% { transform: translateX(-50px); }
+  50% { transform: translateX(50px); }
+  100% { transform: translateX(-50px); }
+}
+
+@keyframes bilateral-vertical {
+  0% { transform: translateY(-30px); }
+  50% { transform: translateY(30px); }
+  100% { transform: translateY(-30px); }
+}
+
+.stimulation-dot {
+  width: 20px;
+  height: 20px;
+  background-color: #3b82f6;
+  border-radius: 50%;
+  position: relative;
+}
+
+.stimulation-horizontal {
+  animation: bilateral-horizontal 2s infinite ease-in-out;
+}
+
+.stimulation-vertical {
+  animation: bilateral-vertical 2s infinite ease-in-out;
+}
+
+/* Safety and emergency styles */
+.emergency-button {
+  @apply bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full
+         shadow-lg transition-colors duration-200;
+}
+
+.grounding-container {
+  @apply bg-green-50 border border-green-200 rounded-lg p-6 m-4;
+}
+
+/* Agent interface styles */
+.agent-avatar {
+  @apply w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600
+         flex items-center justify-center text-white font-semibold;
+}
+
+.therapy-session {
+  @apply min-h-screen bg-gradient-to-br from-slate-50 to-blue-50;
+}
