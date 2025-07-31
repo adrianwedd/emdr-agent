@@ -1,0 +1,274 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User management
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  hashedPassword    String?
+  firstName         String?
+  lastName          String?
+  isActive          Boolean  @default(true)
+  emailVerified     Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // EMDR-specific fields
+  safetyProfile     SafetyProfile?
+  sessions          EMDRSession[]
+  targetMemories    TargetMemory[]
+  progressReports   ProgressReport[]
+
+  @@map("users")
+}
+
+// Safety assessment and monitoring
+model SafetyProfile {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  riskLevel             RiskLevel @default(LOW)
+  contraindications     String[]
+  emergencyContacts     Json?
+  professionalSupport   Json?
+  crisisProtocols       Json?
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("safety_profiles")
+}
+
+// Target memories for EMDR processing
+model TargetMemory {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  description       String
+  image             String?
+  negativeCognition String
+  positiveCognition String
+  emotion           String
+  bodyLocation      String?
+  
+  initialSUD        Int
+  initialVOC        Int
+  
+  isActive          Boolean  @default(true)
+  isResolved        Boolean  @default(false)
+  
+  sessions          EMDRSession[]
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("target_memories")
+}
+
+// EMDR therapy sessions
+model EMDRSession {
+  id                String        @id @default(cuid())
+  userId            String
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetMemoryId    String
+  targetMemory      TargetMemory  @relation(fields: [targetMemoryId], references: [id], onDelete: Cascade)
+  
+  phase             EMDRPhase
+  state             SessionState  @default(PREPARING)
+  
+  startTime         DateTime?
+  endTime           DateTime?
+  totalDuration     Int?          // in seconds
+  
+  // Measurements
+  initialSUD        Int
+  currentSUD        Int?
+  finalSUD          Int?
+  initialVOC        Int
+  currentVOC        Int?
+  finalVOC          Int?
+  
+  // Session data
+  preparationNotes  String?
+  currentSetNumber  Int           @default(0)
+  phaseData         Json?
+  sessionData       Json?         // Additional session metadata
+  
+  // Related records
+  sets              EMDRSet[]
+  agentMessages     AgentMessage[]
+  safetyChecks      SafetyCheck[]
+  
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@map("emdr_sessions")
+}
+
+// Individual EMDR sets within a session
+model EMDRSet {
+  id                String      @id @default(cuid())
+  sessionId         String
+  session           EMDRSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  setNumber         Int
+  startTime         DateTime
+  endTime           DateTime?
+  duration          Int?        // in seconds
+  
+  stimulationSettings Json      // BilateralStimulationSettings
+  userFeedback        Json?     // User responses after the set
+  agentObservations   Json?     // Agent observations
+  
+  createdAt         DateTime    @default(now())
+
+  @@map("emdr_sets")
+}
+
+// Agent interactions and messages
+model AgentMessage {
+  id                String      @id @default(cuid())
+  sessionId         String
+  session           EMDRSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  agentId           String
+  agentType         AgentType
+  messageType       MessageType
+  priority          Priority    @default(MEDIUM)
+  
+  content           Json        // Message content and metadata
+  userResponse      Json?       // User's response if applicable
+  
+  responseRequired  Boolean     @default(false)
+  responseReceived  Boolean     @default(false)
+  status            MessageStatus @default(PENDING)
+  
+  timestamp         DateTime    @default(now())
+
+  @@map("agent_messages")
+}
+
+// Safety monitoring and checks
+model SafetyCheck {
+  id                String      @id @default(cuid())
+  sessionId         String
+  session           EMDRSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  checkType         SafetyCheckType
+  trigger           String?
+  measurements      Json        // Safety measurements
+  action            SafetyAction
+  intervention      Json?       // Intervention details if any
+  
+  timestamp         DateTime    @default(now())
+
+  @@map("safety_checks")
+}
+
+// Progress tracking over time
+model ProgressReport {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  reportType        String   // weekly, monthly, outcome_based
+  period            Json     // Date range for the report
+  
+  metrics           Json     // Progress metrics and analysis
+  insights          Json     // AI-generated insights
+  recommendations   String[]
+  
+  createdAt         DateTime @default(now())
+
+  @@map("progress_reports")
+}
+
+// Enums
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum EMDRPhase {
+  PREPARATION
+  ASSESSMENT
+  DESENSITIZATION
+  INSTALLATION
+  BODY_SCAN
+  CLOSURE
+  REEVALUATION
+  RESOURCE_INSTALLATION
+}
+
+enum SessionState {
+  PREPARING
+  IN_PROGRESS
+  PAUSED
+  COMPLETED
+  EMERGENCY_STOPPED
+}
+
+enum AgentType {
+  THERAPIST
+  SESSION_ORCHESTRATOR
+  SAFETY_MONITOR
+  PROGRESS_ANALYST
+  CRISIS_INTERVENTION
+  RESOURCE_PREPARATION
+  TRAUMA_ASSESSMENT
+}
+
+enum MessageType {
+  GUIDANCE
+  QUESTION
+  ASSESSMENT
+  INTERVENTION
+  EDUCATION
+  SAFETY_CHECK
+  EMERGENCY_ALERT
+  PROTOCOL_ADJUSTMENT
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+  CRITICAL
+}
+
+enum MessageStatus {
+  PENDING
+  DELIVERED
+  ACKNOWLEDGED
+  RESPONDED
+  EXPIRED
+}
+
+enum SafetyCheckType {
+  AUTOMATIC
+  MANUAL
+  TRIGGERED
+  SCHEDULED
+}
+
+enum SafetyAction {
+  CONTINUE
+  PAUSE
+  GROUNDING
+  EMERGENCY_STOP
+  PROFESSIONAL_REFERRAL
+}

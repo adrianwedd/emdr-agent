@@ -1569,7 +1569,7 @@ finalize_setup() {
     touch backend/prisma/migrations/.gitkeep
     
     # Make scripts executable
-    chmod +x scripts/setup.sh
+    chmod +x setup.sh
     
     print_success "Setup finalization complete."
 }
