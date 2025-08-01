@@ -10,6 +10,10 @@ import { Server as SocketIOServer } from 'socket.io';
 // Load environment variables
 dotenv.config();
 
+// Import services
+import { prismaService, createLLMService } from './services';
+import { logger, logStream } from './utils/logger';
+
 const app = express();
 const server = createServer(app);
 const io = new SocketIOServer(server, {
@@ -28,17 +32,61 @@ app.use(cors({
   credentials: true
 }));
 app.use(compression());
-app.use(morgan('combined'));
+app.use(morgan('combined', { stream: logStream }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    version: process.env.npm_package_version || '0.1.0'
-  });
+// Initialize services
+async function initializeServices() {
+  try {
+    logger.info('Initializing services...');
+    
+    // Connect to database
+    await prismaService.connect();
+    
+    // Initialize LLM service
+    if (process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY) {
+      createLLMService();
+      logger.info('LLM service initialized');
+    } else {
+      logger.warn('No LLM API keys found - AI features will be disabled');
+    }
+    
+    logger.info('Services initialized successfully');
+  } catch (error) {
+    logger.error('Failed to initialize services:', error);
+    process.exit(1);
+  }
+}
+
+// Enhanced health check endpoint
+app.get('/health', async (req, res) => {
+  try {
+    const dbHealth = await prismaService.healthCheck();
+    
+    const health = {
+      status: dbHealth.healthy ? 'healthy' : 'degraded',
+      timestamp: new Date().toISOString(),
+      version: process.env.npm_package_version || '0.1.0',
+      services: {
+        database: {
+          status: dbHealth.healthy ? 'up' : 'down',
+          latency: dbHealth.latency,
+          error: dbHealth.error
+        }
+      }
+    };
+
+    const statusCode = dbHealth.healthy ? 200 : 503;
+    res.status(statusCode).json(health);
+  } catch (error) {
+    logger.error('Health check failed:', error);
+    res.status(503).json({
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      error: 'Health check failed'
+    });
+  }
 });
 
 // API routes placeholder
@@ -52,21 +100,26 @@ app.get('/api', (req, res) => {
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
+  logger.info(`Client connected: ${socket.id}`);
   
   socket.on('join_session', (sessionId: string) => {
     socket.join(`session_${sessionId}`);
-    console.log(`Client ${socket.id} joined session ${sessionId}`);
+    logger.info(`Client ${socket.id} joined session ${sessionId}`);
+  });
+  
+  socket.on('leave_session', (sessionId: string) => {
+    socket.leave(`session_${sessionId}`);
+    logger.info(`Client ${socket.id} left session ${sessionId}`);
   });
   
   socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
+    logger.info(`Client disconnected: ${socket.id}`);
   });
 });
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Error:', err);
+  logger.error('Express error:', err);
   res.status(500).json({
     error: 'Internal server error',
     message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
@@ -81,11 +134,39 @@ app.use('*', (req, res) => {
   });
 });
 
-// Start server
-server.listen(PORT, () => {
-  console.log(`🧠 Agentic EMDR API server running on port ${PORT}`);
-  console.log(`🔗 Health check: http://localhost:${PORT}/health`);
-  console.log(`📡 WebSocket server ready for connections`);
+// Graceful shutdown handling
+process.on('SIGTERM', async () => {
+  logger.info('SIGTERM received, shutting down gracefully...');
+  await prismaService.shutdown();
+  process.exit(0);
 });
+
+process.on('SIGINT', async () => {
+  logger.info('SIGINT received, shutting down gracefully...');
+  await prismaService.shutdown();
+  process.exit(0);
+});
+
+// Start server
+async function startServer() {
+  try {
+    // Initialize services first
+    await initializeServices();
+    
+    // Then start the server
+    server.listen(PORT, () => {
+      logger.info(`🧠 Agentic EMDR API server running on port ${PORT}`);
+      logger.info(`🔗 Health check: http://localhost:${PORT}/health`);
+      logger.info(`📡 WebSocket server ready for connections`);
+      logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    });
+  } catch (error) {
+    logger.error('Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+// Start the application
+startServer();
 
 export default app;

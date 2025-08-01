@@ -1,10 +1,28 @@
 // backend/src/agents/therapy/EMDRTherapistAgent.ts
 
-import { BaseAgent, AgentType, AgentMessage, AgentDecision, AgentState, AgentConfiguration, MessageType, Priority } from '../../../../shared/types/Agent';
+import { 
+  BaseAgent, 
+  AgentType, 
+  AgentMessage, 
+  AgentDecision, 
+  AgentState, 
+  AgentConfiguration, 
+  MessageType, 
+  Priority,
+  AgentMemory,
+  AgentLearning,
+  AgentCoordination,
+  AgentPerformanceMetrics
+} from '../../../../shared/types/Agent';
 import { EMDRPhase, EMDRSession, DistressLevel, ValidityOfCognition, SessionState } from '../../../../shared/types/EMDR';
-import { LLMService } from '../../services/LLMService';
-import { SessionService } from '../../services/SessionService';
-import { SafetyProtocolService } from '../../services/SafetyProtocolService';
+import { 
+  LLMService, 
+  SessionService, 
+  SafetyProtocolService,
+  sessionService,
+  safetyProtocolService
+} from '../../services';
+import { logger } from '../../utils/logger';
 
 export class EMDRTherapistAgent implements BaseAgent {
   id: string;
@@ -20,15 +38,13 @@ export class EMDRTherapistAgent implements BaseAgent {
   constructor(
     id: string,
     configuration: AgentConfiguration,
-    llmService: LLMService,
-    sessionService: SessionService,
-    safetyService: SafetyProtocolService
+    llmService: LLMService
   ) {
     this.id = id;
     this.configuration = configuration;
     this.llmService = llmService;
-    this.sessionService = sessionService;
-    this.safetyService = safetyService;
+    this.sessionService = sessionService; // Use singleton
+    this.safetyService = safetyProtocolService; // Use singleton
     
     this.state = {
       agentId: id,
