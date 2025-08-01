@@ -89,14 +89,11 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// API routes placeholder
-app.get('/api', (req, res) => {
-  res.json({
-    message: 'Agentic EMDR API',
-    version: '0.1.0',
-    documentation: '/api/docs'
-  });
-});
+// Import API routes
+import apiRoutes from './routes';
+
+// Mount API routes
+app.use('/api', apiRoutes);
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
