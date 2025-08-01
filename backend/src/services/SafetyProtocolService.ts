@@ -510,12 +510,6 @@ export class SafetyProtocolService {
     return [...this.groundingTechniques];
   }
 
-  /**
-   * Get crisis resources
-   */
-  public getCrisisResources(): CrisisResource[] {
-    return [...this.crisisResources];
-  }
 
   /**
    * Trigger manual safety check

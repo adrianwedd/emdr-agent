@@ -409,37 +409,6 @@ export const validationSchemas = {
     state: z.enum(['PREPARING', 'IN_PROGRESS', 'PAUSED', 'COMPLETED', 'EMERGENCY_STOPPED']).optional()
   }),
 
-  createSession: {
-    body: z.object({
-      targetMemoryId: z.string().uuid('Invalid target memory ID'),
-      initialSUD: commonSchemas.sudLevel,
-      initialVOC: commonSchemas.vocLevel,
-      preparationNotes: z.string().max(1000).optional()
-    })
-  },
-
-  completeSession: {
-    body: z.object({
-      notes: z.string().max(1000).optional()
-    })
-  },
-
-  emergencyStop: {
-    body: z.object({
-      reason: z.string().min(1, 'Reason is required').max(500)
-    })
-  },
-
-  startSet: {
-    body: z.object({
-      stimulationSettings: z.object({
-        type: z.enum(['VISUAL', 'AUDITORY', 'TACTILE']),
-        duration: z.number().min(10).max(300), // 10 seconds to 5 minutes
-        speed: z.number().min(0.5).max(5), // BPM multiplier
-        intensity: z.number().min(1).max(100)
-      })
-    })
-  },
 
   completeSet: {
     body: z.object({

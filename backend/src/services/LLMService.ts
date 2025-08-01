@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import Anthropic from '@anthropic-ai/sdk';
+import { Anthropic } from '@anthropic-ai/sdk';
 import { logger } from '../utils/logger';
 
 export interface LLMRequest {
@@ -57,12 +57,16 @@ export class LLMService {
 
     // Initialize Anthropic client if configured
     if (config.anthropic?.apiKey) {
-      this.anthropicClient = new Anthropic({
-        apiKey: config.anthropic.apiKey,
-        timeout: config.timeout,
-        maxRetries: config.maxRetries,
-      });
-      logger.info('Anthropic client initialized');
+      try {
+        this.anthropicClient = new Anthropic({
+          apiKey: config.anthropic.apiKey,
+          timeout: config.timeout,
+          maxRetries: config.maxRetries,
+        });
+        logger.info('Anthropic client initialized');
+      } catch (error) {
+        logger.warn('Failed to initialize Anthropic client:', error);
+      }
     }
 
     if (!this.openaiClient && !this.anthropicClient) {

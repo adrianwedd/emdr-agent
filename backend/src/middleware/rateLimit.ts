@@ -12,6 +12,11 @@ const createRateLimiter = (options: {
   keyGenerator?: (req: Request) => string;
   skip?: (req: Request) => boolean;
 }) => {
+  // For development, return a no-op middleware
+  if (process.env.NODE_ENV === 'development') {
+    return (req: Request, res: Response, next: any) => next();
+  }
+  
   return rateLimit({
     windowMs: options.windowMs,
     max: options.max,
@@ -23,8 +28,8 @@ const createRateLimiter = (options: {
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: options.keyGenerator || ((req: Request) => {
-      // Use user ID if authenticated, otherwise IP
-      return req.user?.id || req.ip || 'unknown';
+      // Use user ID if authenticated, fallback to 'anonymous' for development
+      return req.user?.id || 'anonymous';
     }),
     skip: options.skip,
     handler: (req: Request, res: Response) => {

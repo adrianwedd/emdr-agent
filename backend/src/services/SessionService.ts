@@ -672,32 +672,6 @@ export class SessionService {
     }
   }
 
-  /**
-   * Get user's sessions
-   */
-  public async getUserSessions(userId: string, limit: number = 20, offset: number = 0) {
-    try {
-      const sessions = await this.prisma.eMDRSession.findMany({
-        where: { userId },
-        include: {
-          targetMemory: {
-            select: {
-              id: true,
-              description: true
-            }
-          }
-        },
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-        skip: offset
-      });
-
-      return sessions;
-    } catch (error) {
-      logger.error(`Failed to get sessions for user ${userId}:`, error);
-      throw prismaService.handlePrismaError(error);
-    }
-  }
 
   /**
    * Get session metrics

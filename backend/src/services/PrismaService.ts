@@ -8,36 +8,10 @@ export class PrismaService {
 
   private constructor() {
     this.prisma = new PrismaClient({
-      log: [
-        { level: 'query', emit: 'event' },
-        { level: 'error', emit: 'event' },
-        { level: 'info', emit: 'event' },
-        { level: 'warn', emit: 'event' },
-      ],
+      log: process.env.NODE_ENV === 'development' 
+        ? ['query', 'info', 'warn', 'error']
+        : ['error'],
       errorFormat: 'colorless',
-    });
-
-    // Add query logging for development
-    if (process.env.NODE_ENV === 'development') {
-      this.prisma.$on('query', (e) => {
-        logger.debug('Query: ' + e.query);
-        logger.debug('Params: ' + e.params);
-        logger.debug('Duration: ' + e.duration + 'ms');
-      });
-    }
-
-    // Error logging
-    this.prisma.$on('error', (e) => {
-      logger.error('Prisma error:', e);
-    });
-
-    // Info and warn logging
-    this.prisma.$on('info', (e) => {
-      logger.info('Prisma info:', e.message);
-    });
-
-    this.prisma.$on('warn', (e) => {
-      logger.warn('Prisma warning:', e.message);
     });
   }
 
@@ -120,7 +94,7 @@ export class PrismaService {
    * Execute a transaction
    */
   public async transaction<T>(
-    fn: (prisma: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use'>) => Promise<T>
+    fn: (prisma: any) => Promise<T>
   ): Promise<T> {
     try {
       return await this.prisma.$transaction(fn);
