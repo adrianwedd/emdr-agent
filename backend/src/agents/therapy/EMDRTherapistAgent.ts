@@ -5,7 +5,8 @@ import {
   AgentType, 
   AgentMessage, 
   AgentDecision, 
-  AgentState, 
+  AgentState,
+  AgentStateData, 
   AgentConfiguration, 
   MessageType, 
   Priority,
@@ -28,7 +29,7 @@ export class EMDRTherapistAgent implements BaseAgent {
   id: string;
   type: AgentType = AgentType.THERAPIST;
   configuration: AgentConfiguration;
-  state: AgentState;
+  state: AgentStateData;
   memory: AgentMemory[] = [];
 
   private llmService: LLMService;
@@ -462,7 +463,7 @@ export class EMDRTherapistAgent implements BaseAgent {
     return decision;
   }
 
-  async updateState(newState: Partial<AgentState>): Promise<void> {
+  async updateState(newState: Partial<AgentStateData>): Promise<void> {
     this.state = {
       ...this.state,
       ...newState,

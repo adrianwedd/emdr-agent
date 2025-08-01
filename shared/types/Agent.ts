@@ -283,7 +283,7 @@ export interface AgentPerformanceMetrics {
   };
 }
 
-export interface AgentState {
+export interface AgentStateData {
   agentId: string;
   agentType: AgentType;
   currentState: AgentState;
@@ -370,14 +370,14 @@ export interface BaseAgent {
   id: string;
   type: AgentType;
   configuration: AgentConfiguration;
-  state: AgentState;
+  state: AgentStateData;
   memory: AgentMemory[];
   
   // Core methods that all agents must implement
   initialize(config: AgentConfiguration): Promise<void>;
   processMessage(message: AgentMessage): Promise<AgentMessage | null>;
   makeDecision(context: any): Promise<AgentDecision>;
-  updateState(newState: Partial<AgentState>): Promise<void>;
+  updateState(newState: Partial<AgentStateData>): Promise<void>;
   
   // Memory management
   storeMemory(memory: Omit<AgentMemory, 'id' | 'createdAt' | 'updatedAt'>): Promise<void>;

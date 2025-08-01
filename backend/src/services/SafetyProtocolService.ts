@@ -539,6 +539,210 @@ export class SafetyProtocolService {
 
     return assessment;
   }
+
+  /**
+   * Update safety measurements for a session
+   */
+  public async updateSafetyMeasurements(sessionId: string, measurements: any): Promise<any> {
+    try {
+      logger.debug(`Updating safety measurements for session: ${sessionId}`);
+
+      // Create safety check record
+      const safetyCheck = await this.prisma.safetyCheck.create({
+        data: {
+          sessionId,
+          checkType: SafetyCheckType.AUTOMATIC,
+          trigger: 'Measurement update',
+          measurements,
+          action: SafetyAction.CONTINUE,
+          timestamp: new Date()
+        }
+      });
+
+      logger.info(`Safety measurements updated for session: ${sessionId}`);
+      return {
+        sessionId,
+        measurements,
+        safetyCheckId: safetyCheck.id,
+        updated: true,
+        timestamp: new Date()
+      };
+    } catch (error) {
+      logger.error(`Failed to update safety measurements for session ${sessionId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get safety history for a session
+   */
+  public async getSafetyHistory(sessionId: string): Promise<SafetyCheck[]> {
+    try {
+      logger.debug(`Getting safety history for session: ${sessionId}`);
+
+      const history = await this.prisma.safetyCheck.findMany({
+        where: { sessionId },
+        orderBy: { timestamp: 'desc' }
+      });
+
+      logger.debug(`Retrieved ${history.length} safety checks for session: ${sessionId}`);
+      return history;
+    } catch (error) {
+      logger.error(`Failed to get safety history for session ${sessionId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Trigger emergency protocol
+   */
+  public async triggerEmergencyProtocol(sessionId: string, details: {
+    reason: string;
+    severity: string;
+    triggeredBy: string;
+  }): Promise<any> {
+    try {
+      logger.warn(`Emergency protocol triggered for session: ${sessionId} - ${details.reason}`);
+
+      // Create emergency safety check
+      const emergencyCheck = await this.prisma.safetyCheck.create({
+        data: {
+          sessionId,
+          checkType: SafetyCheckType.EMERGENCY,
+          trigger: details.reason,
+          measurements: {
+            severity: details.severity,
+            triggeredBy: details.triggeredBy,
+            timestamp: new Date().toISOString()
+          },
+          action: SafetyAction.EMERGENCY_STOP
+        }
+      });
+
+      // Emergency stop the session
+      await this.prisma.eMDRSession.update({
+        where: { id: sessionId },
+        data: {
+          state: 'EMERGENCY_STOPPED',
+          endTime: new Date(),
+          sessionData: {
+            emergencyStop: true,
+            emergencyReason: details.reason,
+            emergencyTime: new Date().toISOString()
+          }
+        }
+      });
+
+      logger.error(`Emergency protocol activated for session: ${sessionId}`);
+      return {
+        sessionId,
+        emergencyCheckId: emergencyCheck.id,
+        reason: details.reason,
+        severity: details.severity,
+        triggeredBy: details.triggeredBy,
+        timestamp: new Date(),
+        crisisResources: this.crisisResources
+      };
+    } catch (error) {
+      logger.error(`Failed to trigger emergency protocol for session ${sessionId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get grounding techniques for a user
+   */
+  public async getGroundingTechniques(options: {
+    userId: string;
+    category?: string;
+    difficulty?: string;
+  }): Promise<GroundingTechnique[]> {
+    try {
+      logger.debug(`Getting grounding techniques for user: ${options.userId}`);
+
+      let techniques = [...this.groundingTechniques];
+
+      // Filter by category if specified
+      if (options.category) {
+        techniques = techniques.filter(t => t.type === options.category);
+      }
+
+      // Sort by effectiveness
+      techniques.sort((a, b) => (b.effectiveness || 0) - (a.effectiveness || 0));
+
+      logger.debug(`Retrieved ${techniques.length} grounding techniques for user: ${options.userId}`);
+      return techniques;
+    } catch (error) {
+      logger.error(`Failed to get grounding techniques for user ${options.userId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Report grounding technique effectiveness
+   */
+  public async reportGroundingEffectiveness(report: {
+    userId: string;
+    techniqueId: string;
+    effectiveness: number;
+    feedback?: string;
+  }): Promise<void> {
+    try {
+      logger.debug(`Recording grounding technique effectiveness for user: ${report.userId}`);
+
+      // For now, just log the effectiveness report
+      // In a full implementation, this would update technique effectiveness scores
+      // and personalize recommendations based on user feedback
+      
+      logger.info(`Grounding technique effectiveness reported:`, {
+        userId: report.userId,
+        techniqueId: report.techniqueId,
+        effectiveness: report.effectiveness,
+        feedback: report.feedback,
+        timestamp: new Date()
+      });
+
+      // TODO: Implement effectiveness tracking in database
+      // This would involve creating a new table for user technique preferences
+      // and updating technique effectiveness scores based on user feedback
+      
+    } catch (error) {
+      logger.error(`Failed to report grounding effectiveness for user ${report.userId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get crisis resources
+   */
+  public async getCrisisResources(options: {
+    userId: string;
+    location?: string;
+    type?: string;
+  }): Promise<CrisisResource[]> {
+    try {
+      logger.debug(`Getting crisis resources for user: ${options.userId}`);
+
+      let resources = [...this.crisisResources];
+
+      // Filter by type if specified
+      if (options.type) {
+        resources = resources.filter(r => r.type === options.type);
+      }
+
+      // In a full implementation, this would:
+      // 1. Get user's location preferences from their profile
+      // 2. Filter resources by geographic availability
+      // 3. Prioritize resources based on user's safety profile
+      // 4. Include personalized emergency contacts from user's safety profile
+
+      logger.debug(`Retrieved ${resources.length} crisis resources for user: ${options.userId}`);
+      return resources;
+    } catch (error) {
+      logger.error(`Failed to get crisis resources for user ${options.userId}:`, error);
+      throw error;
+    }
+  }
 }
 
 export const safetyProtocolService = SafetyProtocolService.getInstance();

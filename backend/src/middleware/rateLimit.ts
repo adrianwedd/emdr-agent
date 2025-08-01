@@ -24,7 +24,7 @@ const createRateLimiter = (options: {
     legacyHeaders: false,
     keyGenerator: options.keyGenerator || ((req: Request) => {
       // Use user ID if authenticated, otherwise IP
-      return req.user?.id || req.ip;
+      return req.user?.id || req.ip || 'unknown';
     }),
     skip: options.skip,
     handler: (req: Request, res: Response) => {
@@ -50,7 +50,7 @@ export const authRateLimit = createRateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 20, // 20 authentication attempts per 15 minutes
   message: 'Too many authentication attempts, please try again later.',
-  keyGenerator: (req: Request) => req.ip // Always use IP for auth
+  keyGenerator: (req: Request) => req.ip || 'unknown' || 'unknown' // Always use IP for auth
 });
 
 // Login rate limiting (very strict)
@@ -58,7 +58,7 @@ export const loginRateLimit = createRateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10, // 10 login attempts per 15 minutes per IP
   message: 'Too many login attempts from this IP, please try again later.',
-  keyGenerator: (req: Request) => req.ip
+  keyGenerator: (req: Request) => req.ip || 'unknown'
 });
 
 // Password reset rate limiting
@@ -66,7 +66,7 @@ export const passwordResetRateLimit = createRateLimiter({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 5, // 5 password reset attempts per hour per IP
   message: 'Too many password reset attempts, please try again later.',
-  keyGenerator: (req: Request) => req.ip
+  keyGenerator: (req: Request) => req.ip || 'unknown'
 });
 
 // Registration rate limiting
@@ -74,7 +74,7 @@ export const registrationRateLimit = createRateLimiter({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 10, // 10 registrations per hour per IP
   message: 'Too many registration attempts from this IP, please try again later.',
-  keyGenerator: (req: Request) => req.ip
+  keyGenerator: (req: Request) => req.ip || 'unknown'
 });
 
 // Session creation rate limiting (prevent abuse)
@@ -128,7 +128,7 @@ export const accountDeletionRateLimit = createRateLimiter({
   windowMs: 24 * 60 * 60 * 1000, // 24 hours
   max: 1, // 1 deletion attempt per day per IP
   message: 'Account deletion is limited to once per day per IP address.',
-  keyGenerator: (req: Request) => req.ip
+  keyGenerator: (req: Request) => req.ip || 'unknown'
 });
 
 // Flexible rate limiter for custom use cases
@@ -143,8 +143,8 @@ export const createCustomRateLimit = (options: {
     max: options.maxRequests,
     message: options.message || `Too many requests, limit is ${options.maxRequests} per ${options.windowMinutes} minutes.`,
     keyGenerator: options.useUserIdKey 
-      ? (req: Request) => req.user?.id || req.ip
-      : (req: Request) => req.ip
+      ? (req: Request) => req.user?.id || req.ip || 'unknown'
+      : (req: Request) => req.ip || 'unknown'
   });
 };
 

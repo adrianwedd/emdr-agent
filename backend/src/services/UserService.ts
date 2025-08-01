@@ -159,18 +159,18 @@ export class UserService {
         update: {
           riskLevel: data.riskLevel,
           contraindications: data.contraindications,
-          emergencyContacts: data.emergencyContacts || null,
-          professionalSupport: data.professionalSupport || null,
-          crisisProtocols: data.crisisProtocols || null,
+          emergencyContacts: data.emergencyContacts || undefined,
+          professionalSupport: data.professionalSupport || undefined,
+          crisisProtocols: data.crisisProtocols || undefined,
           updatedAt: new Date()
         },
         create: {
           userId,
           riskLevel: data.riskLevel,
           contraindications: data.contraindications,
-          emergencyContacts: data.emergencyContacts || null,
-          professionalSupport: data.professionalSupport || null,
-          crisisProtocols: data.crisisProtocols || null
+          emergencyContacts: data.emergencyContacts || undefined,
+          professionalSupport: data.professionalSupport || undefined,
+          crisisProtocols: data.crisisProtocols || undefined
         }
       });
 
@@ -213,7 +213,6 @@ export class UserService {
             state: 'COMPLETED',
             startTime: { not: null },
             endTime: { not: null },
-            initialSUD: { not: null },
             finalSUD: { not: null }
           },
           _avg: {
@@ -235,8 +234,8 @@ export class UserService {
       ]);
 
       // Calculate improvement rate
-      const avgInitialSUD = sessionMetrics._avg.initialSUD || 0;
-      const avgFinalSUD = sessionMetrics._avg.finalSUD || 0;
+      const avgInitialSUD = sessionMetrics._avg?.initialSUD || 0;
+      const avgFinalSUD = sessionMetrics._avg?.finalSUD || 0;
       const improvementRate = avgInitialSUD > 0 
         ? ((avgInitialSUD - avgFinalSUD) / avgInitialSUD) * 100 
         : 0;
@@ -244,8 +243,8 @@ export class UserService {
       const stats: UserStats = {
         totalSessions,
         completedSessions,
-        averageSessionDuration: Math.round(sessionMetrics._avg.totalDuration || 0),
-        totalProcessingTime: sessionMetrics._sum.totalDuration || 0,
+        averageSessionDuration: Math.round(sessionMetrics._avg?.totalDuration || 0),
+        totalProcessingTime: sessionMetrics._sum?.totalDuration || 0,
         lastSessionDate: lastSession?.createdAt,
         progressMetrics: {
           avgInitialSUD: Math.round((avgInitialSUD || 0) * 10) / 10,
@@ -384,13 +383,33 @@ export class UserService {
   /**
    * Delete user account and all associated data
    */
-  public async deleteAccount(userId: string): Promise<void> {
+  public async deleteAccount(userId: string, password: string): Promise<void> {
     try {
       logger.warn(`Deleting user account and all data: ${userId}`);
 
+      // Verify password before deletion
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId }
+      });
+
+      if (!user || !user.hashedPassword) {
+        throw new Error('User not found or invalid account state');
+      }
+
+      // Import bcrypt and verify password
+      const bcrypt = require('bcryptjs');
+      const isValidPassword = await bcrypt.compare(password, user.hashedPassword);
+      if (!isValidPassword) {
+        throw new Error('Invalid password - account deletion cancelled');
+      }
+
       await this.prisma.$transaction(async (tx) => {
         // Delete in correct order due to foreign key constraints
-        await tx.agentMessage.deleteMany({ where: { userId } });
+        await tx.agentMessage.deleteMany({ 
+          where: { 
+            session: { userId } 
+          } 
+        });
         await tx.safetyCheck.deleteMany({ 
           where: { 
             session: { userId } 

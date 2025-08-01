@@ -42,9 +42,18 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     }
 
     const token = parts[1];
-    const user = await authService.verifyAccessToken(token);
+    const dbUser = await authService.verifyAccessToken(token);
     
-    req.user = user;
+    // Transform Prisma user type to Express user type (null -> undefined)
+    req.user = {
+      id: dbUser.id,
+      email: dbUser.email,
+      firstName: dbUser.firstName ?? undefined,
+      lastName: dbUser.lastName ?? undefined,
+      isActive: dbUser.isActive,
+      emailVerified: dbUser.emailVerified,
+      safetyProfile: dbUser.safetyProfile
+    };
     next();
   } catch (error) {
     logger.debug('Authentication failed:', error);
@@ -68,8 +77,17 @@ export const optionalAuth = async (req: Request, res: Response, next: NextFuncti
       if (parts.length === 2 && parts[0] === 'Bearer') {
         const token = parts[1];
         try {
-          const user = await authService.verifyAccessToken(token);
-          req.user = user;
+          const dbUser = await authService.verifyAccessToken(token);
+          // Transform Prisma user type to Express user type (null -> undefined)
+          req.user = {
+            id: dbUser.id,
+            email: dbUser.email,
+            firstName: dbUser.firstName ?? undefined,
+            lastName: dbUser.lastName ?? undefined,
+            isActive: dbUser.isActive,
+            emailVerified: dbUser.emailVerified,
+            safetyProfile: dbUser.safetyProfile
+          };
         } catch (error) {
           // Optional auth - don't fail if token is invalid
           logger.debug('Optional authentication failed:', error);

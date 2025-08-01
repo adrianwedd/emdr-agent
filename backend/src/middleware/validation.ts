@@ -22,7 +22,7 @@ export const validate = (schemas: {
             details: bodyResult.error.issues.map(issue => ({
               field: issue.path.join('.'),
               message: issue.message,
-              received: issue.received
+              received: 'received' in issue ? issue.received : undefined
             }))
           });
         }
@@ -39,7 +39,7 @@ export const validate = (schemas: {
             details: queryResult.error.issues.map(issue => ({
               field: issue.path.join('.'),
               message: issue.message,
-              received: issue.received
+              received: 'received' in issue ? issue.received : undefined
             }))
           });
         }
@@ -56,7 +56,7 @@ export const validate = (schemas: {
             details: paramsResult.error.issues.map(issue => ({
               field: issue.path.join('.'),
               message: issue.message,
-              received: issue.received
+              received: 'received' in issue ? issue.received : undefined
             }))
           });
         }
@@ -75,7 +75,7 @@ export const validate = (schemas: {
 };
 
 // Common validation schemas
-export const commonSchemas = {
+export const commonSchemas: Record<string, ZodSchema> = {
   // UUID parameter validation
   uuidParam: z.object({
     id: z.string().uuid('Invalid ID format')
@@ -171,10 +171,13 @@ export const commonSchemas = {
 
   // Emergency contact validation
   emergencyContact: z.object({
-    name: commonSchemas.name,
+    name: z.string()
+      .min(1, 'Name is required')
+      .max(100, 'Name must be less than 100 characters')
+      .regex(/^[a-zA-Z\s\-'\.]+$/, 'Name can only contain letters, spaces, hyphens, apostrophes, and periods'),
     relationship: z.string().min(1, 'Relationship is required').max(50, 'Relationship must be less than 50 characters'),
     phone: z.string().regex(/^\+?[\d\s\-\(\)]{10,20}$/, 'Invalid phone number format'),
-    email: commonSchemas.email.optional()
+    email: z.string().email('Invalid email format').toLowerCase().optional()
   })
 };
 
@@ -209,6 +212,9 @@ export const validationSchemas = {
       newPassword: commonSchemas.password
     })
   },
+
+  // Common parameter schemas
+  uuidParam: commonSchemas.uuidParam,
 
   // User schemas
   updateProfile: {
@@ -337,6 +343,155 @@ export const validationSchemas = {
   manualSafetyCheck: {
     body: z.object({
       reason: z.string().min(5, 'Reason must be at least 5 characters').max(500)
+    })
+  },
+
+  safetyCheck: {
+    body: z.object({
+      sessionId: z.string().uuid('Invalid session ID'),
+      reason: z.string().max(500).optional()
+    })
+  },
+
+  sessionIdParam: z.object({
+    sessionId: z.string().uuid('Invalid session ID format')
+  }),
+
+  safetyMeasurements: {
+    body: z.object({
+      sudLevel: commonSchemas.sudLevel.optional(),
+      vocLevel: commonSchemas.vocLevel.optional(),
+      physiological: z.object({
+        heartRate: z.number().min(30).max(200).optional(),
+        bloodPressure: z.string().optional(),
+        breathing: z.enum(['NORMAL', 'SHALLOW', 'RAPID', 'IRREGULAR']).optional()
+      }).optional(),
+      psychological: z.object({
+        dissociation: z.boolean().optional(),
+        overwhelm: z.boolean().optional(),
+        flashbacks: z.boolean().optional()
+      }).optional()
+    })
+  },
+
+  emergencyTrigger: {
+    body: z.object({
+      sessionId: z.string().uuid('Invalid session ID'),
+      reason: z.string().min(1, 'Reason is required').max(500),
+      severity: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional()
+    })
+  },
+
+  groundingQuery: z.object({
+    category: z.enum(['sensory', 'breathing', 'movement', 'cognitive']).optional(),
+    difficulty: z.enum(['easy', 'medium', 'hard']).optional()
+  }),
+
+  groundingEffectiveness: {
+    body: z.object({
+      techniqueId: z.string().min(1, 'Technique ID is required'),
+      effectiveness: z.number().min(1).max(10, 'Effectiveness must be between 1 and 10'),
+      feedback: z.string().max(500).optional()
+    })
+  },
+
+  crisisResourcesQuery: z.object({
+    location: z.string().max(100).optional(),
+    type: z.enum(['hotline', 'text', 'professional', 'emergency']).optional()
+  }),
+
+  // Session schemas
+  sessionQuery: z.object({
+    page: z.string().optional().transform(val => val ? parseInt(val, 10) : 1)
+      .refine(val => val >= 1, 'Page must be >= 1'),
+    limit: z.string().optional().transform(val => val ? parseInt(val, 10) : 20)
+      .refine(val => val >= 1 && val <= 100, 'Limit must be between 1 and 100'),
+    state: z.enum(['PREPARING', 'IN_PROGRESS', 'PAUSED', 'COMPLETED', 'EMERGENCY_STOPPED']).optional()
+  }),
+
+  createSession: {
+    body: z.object({
+      targetMemoryId: z.string().uuid('Invalid target memory ID'),
+      initialSUD: commonSchemas.sudLevel,
+      initialVOC: commonSchemas.vocLevel,
+      preparationNotes: z.string().max(1000).optional()
+    })
+  },
+
+  completeSession: {
+    body: z.object({
+      notes: z.string().max(1000).optional()
+    })
+  },
+
+  emergencyStop: {
+    body: z.object({
+      reason: z.string().min(1, 'Reason is required').max(500)
+    })
+  },
+
+  startSet: {
+    body: z.object({
+      stimulationSettings: z.object({
+        type: z.enum(['VISUAL', 'AUDITORY', 'TACTILE']),
+        duration: z.number().min(10).max(300), // 10 seconds to 5 minutes
+        speed: z.number().min(0.5).max(5), // BPM multiplier
+        intensity: z.number().min(1).max(100)
+      })
+    })
+  },
+
+  completeSet: {
+    body: z.object({
+      userFeedback: z.object({
+        sudLevel: commonSchemas.sudLevel.optional(),
+        vocLevel: commonSchemas.vocLevel.optional(),
+        notes: z.string().max(500).optional()
+      }).optional(),
+      agentObservations: z.object({
+        engagement: z.number().min(0).max(1).optional(),
+        distress: z.number().min(0).max(1).optional(),
+        notes: z.string().max(500).optional()
+      }).optional()
+    })
+  },
+
+  setParams: z.object({
+    id: z.string().uuid('Invalid session ID'),
+    setId: z.string().uuid('Invalid set ID')
+  }),
+
+  updatePhase: {
+    body: z.object({
+      phase: z.enum(['PREPARATION', 'ASSESSMENT', 'DESENSITIZATION', 'INSTALLATION', 'BODY_SCAN', 'CLOSURE', 'REEVALUATION']),
+      phaseData: z.record(z.any()).optional()
+    })
+  },
+
+  // User profile schemas
+  safetyProfile: {
+    body: z.object({
+      riskLevel: commonSchemas.riskLevel,
+      contraindications: z.array(z.string().max(200)).max(20),
+      emergencyContacts: z.array(commonSchemas.emergencyContact).max(5).optional(),
+      professionalSupport: z.object({
+        therapistName: commonSchemas.optionalName,
+        therapistPhone: z.string().regex(/^\+?[\d\s\-\(\)]{10,20}$/, 'Invalid phone number').optional(),
+        therapistEmail: commonSchemas.email.optional(),
+        currentTreatment: z.string().max(200).optional(),
+        medications: z.array(z.string().max(100)).max(20).optional()
+      }).optional(),
+      crisisProtocols: z.object({
+        preferredGroundingTechniques: z.array(z.string()).max(10).optional(),
+        triggerWarnings: z.array(z.string().max(100)).max(20).optional(),
+        safetyPlan: z.string().max(1000).optional()
+      }).optional()
+    })
+  },
+
+  deleteAccount: {
+    body: z.object({
+      password: z.string().min(1, 'Password is required for account deletion')
     })
   }
 };

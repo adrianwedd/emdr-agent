@@ -1,5 +1,8 @@
 import { Router } from 'express';
 import authRoutes from './auth';
+import userRoutes from './users';
+import sessionRoutes from './sessions';
+import safetyRoutes from './safety';
 import { generalRateLimit, logRateLimitHits } from '../middleware';
 
 const router = Router();
@@ -8,8 +11,11 @@ const router = Router();
 router.use(generalRateLimit);
 router.use(logRateLimitHits);
 
-// Mount auth routes
+// Mount routes
 router.use('/auth', authRoutes);
+router.use('/users', userRoutes);
+router.use('/sessions', sessionRoutes);
+router.use('/safety', safetyRoutes);
 
 // API root endpoint
 router.get('/', (req, res) => {
@@ -19,9 +25,9 @@ router.get('/', (req, res) => {
     timestamp: new Date().toISOString(),
     endpoints: {
       authentication: '/api/auth/*',
-      users: '/api/users/* (coming soon)',
-      sessions: '/api/sessions/* (coming soon)',
-      safety: '/api/safety/* (coming soon)',
+      users: '/api/users/*',
+      sessions: '/api/sessions/*',
+      safety: '/api/safety/*',
       agents: '/api/agents/* (coming soon)'
     },
     documentation: '/api/docs (coming soon)',

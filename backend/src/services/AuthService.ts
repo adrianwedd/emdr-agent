@@ -98,9 +98,9 @@ export class AuthService {
             create: {
               riskLevel: 'LOW',
               contraindications: [],
-              emergencyContacts: null,
-              professionalSupport: null,
-              crisisProtocols: null
+              emergencyContacts: undefined,
+              professionalSupport: undefined,
+              crisisProtocols: undefined
             }
           }
         },
@@ -152,6 +152,9 @@ export class AuthService {
       }
 
       // Verify password
+      if (!user.hashedPassword) {
+        throw new Error('Invalid email or password');
+      }
       const isValidPassword = await this.verifyPassword(credentials.password, user.hashedPassword);
       if (!isValidPassword) {
         throw new Error('Invalid email or password');
@@ -213,7 +216,7 @@ export class AuthService {
   /**
    * Verify access token and return user
    */
-  public async verifyAccessToken(token: string): Promise<Omit<User, 'hashedPassword'>> {
+  public async verifyAccessToken(token: string): Promise<Omit<User, 'hashedPassword'> & { safetyProfile?: any }> {
     try {
       const payload = this.verifyToken(token, 'access') as TokenPayload;
 
@@ -268,6 +271,9 @@ export class AuthService {
       }
 
       // Verify current password
+      if (!user.hashedPassword) {
+        throw new Error('Current password is incorrect');
+      }
       const isValidPassword = await this.verifyPassword(currentPassword, user.hashedPassword);
       if (!isValidPassword) {
         throw new Error('Current password is incorrect');
