@@ -12,7 +12,7 @@
     "@types/jsonwebtoken": "^9.0.2",
     "@types/morgan": "^1.9.4",
     "@types/uuid": "^9.0.2",
-    "axios": "^1.4.0",
+    "axios": "^1.12.0",
     "bcryptjs": "^2.4.3",
     "compression": "^1.7.4",
     "cors": "^2.8.5",
