@@ -42,6 +42,7 @@ export function adaptPrismaSession<T extends Record<string, unknown>>(prismaSess
 
   if (prismaSession.user && typeof prismaSession.user === 'object') {
     const user = nullToUndefined(prismaSession.user as Record<string, unknown>);
+    delete (user as Record<string, unknown>).hashedPassword;
 
     const rawUser = prismaSession.user as Record<string, unknown>;
     if (rawUser.safetyProfile && typeof rawUser.safetyProfile === 'object') {
@@ -51,6 +52,14 @@ export function adaptPrismaSession<T extends Record<string, unknown>>(prismaSess
     }
 
     adapted.user = user;
+  }
+
+  if (Array.isArray(prismaSession.sets)) {
+    adapted.sets = (prismaSession.sets as Record<string, unknown>[]).map(nullToUndefined);
+  }
+
+  if (Array.isArray(prismaSession.safetyChecks)) {
+    adapted.safetyChecks = (prismaSession.safetyChecks as Record<string, unknown>[]).map(nullToUndefined);
   }
 
   return adapted;

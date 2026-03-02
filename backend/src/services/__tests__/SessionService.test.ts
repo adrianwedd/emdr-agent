@@ -26,6 +26,7 @@ const mockPrismaClient = {
   eMDRSet: {
     create: jest.fn(),
     findFirst: jest.fn(),
+    findUnique: jest.fn(),
     update: jest.fn(),
   },
 };
@@ -71,17 +72,17 @@ jest.mock('@prisma/client', () => ({
   },
 }));
 
-// Mock shared EMDR types
+// Mock shared EMDR types (values must match the real shared enum)
 jest.mock('../../../../shared/types/EMDR', () => ({
   EMDRPhase: {
-    PREPARATION: 'PREPARATION',
-    ASSESSMENT: 'ASSESSMENT',
-    DESENSITIZATION: 'DESENSITIZATION',
-    INSTALLATION: 'INSTALLATION',
-    BODY_SCAN: 'BODY_SCAN',
-    CLOSURE: 'CLOSURE',
-    REEVALUATION: 'REEVALUATION',
-    RESOURCE_INSTALLATION: 'RESOURCE_INSTALLATION',
+    PREPARATION: 'preparation',
+    ASSESSMENT: 'assessment',
+    DESENSITIZATION: 'desensitization',
+    INSTALLATION: 'installation',
+    BODY_SCAN: 'body_scan',
+    CLOSURE: 'closure',
+    REEVALUATION: 'reevaluation',
+    RESOURCE_INSTALLATION: 'resource_installation',
   },
   BilateralStimulationType: {
     VISUAL: 'VISUAL',
@@ -107,16 +108,16 @@ jest.mock('../../../../shared/types/EMDR', () => ({
 import { SessionService } from '../SessionService';
 import { safetyProtocolService } from '../SafetyProtocolService';
 
-// Convenience references
+// Convenience references (must match real shared enum values)
 const EMDRPhase = {
-  PREPARATION: 'PREPARATION',
-  ASSESSMENT: 'ASSESSMENT',
-  DESENSITIZATION: 'DESENSITIZATION',
-  INSTALLATION: 'INSTALLATION',
-  BODY_SCAN: 'BODY_SCAN',
-  CLOSURE: 'CLOSURE',
-  REEVALUATION: 'REEVALUATION',
-  RESOURCE_INSTALLATION: 'RESOURCE_INSTALLATION',
+  PREPARATION: 'preparation',
+  ASSESSMENT: 'assessment',
+  DESENSITIZATION: 'desensitization',
+  INSTALLATION: 'installation',
+  BODY_SCAN: 'body_scan',
+  CLOSURE: 'closure',
+  REEVALUATION: 'reevaluation',
+  RESOURCE_INSTALLATION: 'resource_installation',
 };
 
 // ---------------------------------------------------------------------------
@@ -600,18 +601,27 @@ describe('SessionService', () => {
       agentObservations: { engagement: 0.8 },
     };
 
+    const mockExistingSet = {
+      id: 'set-1',
+      sessionId: 'session-1',
+      startTime: new Date('2025-01-01T10:00:00Z'),
+    };
+
     it('updates the set with completion data', async () => {
       const mockCompletedSet = { id: 'set-1', sessionId: 'session-1', endTime: new Date() };
+      mockPrismaClient.eMDRSet.findUnique.mockResolvedValue(mockExistingSet);
       mockPrismaClient.eMDRSet.update.mockResolvedValue(mockCompletedSet);
       mockPrismaClient.eMDRSession.update.mockResolvedValue({});
 
       const result = await service.completeSet('session-1', 'set-1', setData);
 
+      expect(mockPrismaClient.eMDRSet.findUnique).toHaveBeenCalledWith({ where: { id: 'set-1' } });
       expect(mockPrismaClient.eMDRSet.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'set-1' },
           data: expect.objectContaining({
             endTime: expect.any(Date),
+            duration: expect.any(Number),
             userFeedback: setData.userFeedback,
             agentObservations: setData.agentObservations,
           }),
@@ -621,6 +631,7 @@ describe('SessionService', () => {
     });
 
     it('updates session SUD/VOC when provided', async () => {
+      mockPrismaClient.eMDRSet.findUnique.mockResolvedValue(mockExistingSet);
       mockPrismaClient.eMDRSet.update.mockResolvedValue({ id: 'set-1' });
       mockPrismaClient.eMDRSession.update.mockResolvedValue({});
 
@@ -638,6 +649,7 @@ describe('SessionService', () => {
     });
 
     it('does not update session SUD/VOC when not provided', async () => {
+      mockPrismaClient.eMDRSet.findUnique.mockResolvedValue(mockExistingSet);
       mockPrismaClient.eMDRSet.update.mockResolvedValue({ id: 'set-1' });
 
       await service.completeSet('session-1', 'set-1', {
@@ -648,6 +660,7 @@ describe('SessionService', () => {
     });
 
     it('handles null feedback gracefully', async () => {
+      mockPrismaClient.eMDRSet.findUnique.mockResolvedValue(mockExistingSet);
       mockPrismaClient.eMDRSet.update.mockResolvedValue({ id: 'set-1' });
 
       await service.completeSet('session-1', 'set-1', {});
@@ -662,8 +675,27 @@ describe('SessionService', () => {
       );
     });
 
+    it('throws when set does not belong to session', async () => {
+      mockPrismaClient.eMDRSet.findUnique.mockResolvedValue({
+        ...mockExistingSet,
+        sessionId: 'other-session',
+      });
+
+      await expect(
+        service.completeSet('session-1', 'set-1', setData)
+      ).rejects.toThrow('does not belong to session');
+    });
+
+    it('throws when set not found', async () => {
+      mockPrismaClient.eMDRSet.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.completeSet('session-1', 'set-1', setData)
+      ).rejects.toThrow('not found');
+    });
+
     it('throws when database operation fails', async () => {
-      mockPrismaClient.eMDRSet.update.mockRejectedValue(new Error('DB error'));
+      mockPrismaClient.eMDRSet.findUnique.mockRejectedValue(new Error('DB error'));
 
       await expect(
         service.completeSet('session-1', 'set-1', setData)
@@ -866,12 +898,12 @@ describe('SessionService', () => {
         expect.objectContaining({
           where: { id: 'session-1' },
           data: expect.objectContaining({
-            phase: 'DESENSITIZATION',
+            phase: 'desensitization',
             phaseData: { note: 'test' },
           }),
         })
       );
-      expect(result).toBe(mockUpdated);
+      expect(result).toBeDefined();
     });
 
     it('throws for invalid phase', async () => {
@@ -880,13 +912,21 @@ describe('SessionService', () => {
       ).rejects.toThrow('Invalid phase: INVALID_PHASE');
     });
 
-    it('accepts all valid EMDR phases', async () => {
-      const validPhases = [
+    it('accepts all valid EMDR phases (uppercase and lowercase)', async () => {
+      const uppercasePhases = [
         'PREPARATION', 'ASSESSMENT', 'DESENSITIZATION', 'INSTALLATION',
         'BODY_SCAN', 'CLOSURE', 'REEVALUATION',
       ];
 
-      for (const phase of validPhases) {
+      for (const phase of uppercasePhases) {
+        mockPrismaClient.eMDRSession.update.mockResolvedValue(buildMockSession({ phase }));
+        await expect(
+          service.updateSessionPhase('session-1', phase)
+        ).resolves.toBeDefined();
+      }
+
+      // Also accepts lowercase (shared enum values)
+      for (const phase of Object.values(EMDRPhase)) {
         mockPrismaClient.eMDRSession.update.mockResolvedValue(buildMockSession({ phase }));
         await expect(
           service.updateSessionPhase('session-1', phase)

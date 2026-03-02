@@ -133,6 +133,60 @@ describe('adaptPrismaSession', () => {
     expect(result.user.firstName).toBe('Jane');
   });
 
+  it('strips hashedPassword from adapted user', () => {
+    const session = {
+      ...basePrismaSession,
+      user: {
+        id: 'user-1',
+        email: 'test@example.com',
+        hashedPassword: '$2b$10$somehash',
+        firstName: 'Jane',
+        lastName: null,
+        isActive: true,
+        emailVerified: false,
+        createdAt: new Date('2025-01-01'),
+        updatedAt: new Date('2025-01-01'),
+      },
+    };
+    const result = adaptPrismaSession(session);
+    expect(result.user.hashedPassword).toBeUndefined();
+    expect(result.user).not.toHaveProperty('hashedPassword');
+    expect(result.user.firstName).toBe('Jane');
+  });
+
+  it('adapts nested sets array when present', () => {
+    const session = {
+      ...basePrismaSession,
+      sets: [
+        { id: 'set-1', sessionId: 'session-1', setNumber: 1, startTime: new Date('2025-01-01'), endTime: null, duration: null, stimulationSettings: {}, userFeedback: null, agentObservations: null, createdAt: new Date('2025-01-01') },
+        { id: 'set-2', sessionId: 'session-1', setNumber: 2, startTime: new Date('2025-01-01'), endTime: new Date('2025-01-01'), duration: 30, stimulationSettings: {}, userFeedback: { rating: 'good' }, agentObservations: null, createdAt: new Date('2025-01-01') },
+      ],
+    };
+    const result = adaptPrismaSession(session);
+    expect(result.sets).toHaveLength(2);
+    expect(result.sets[0].endTime).toBeUndefined();
+    expect(result.sets[0].duration).toBeUndefined();
+    expect(result.sets[0].userFeedback).toBeUndefined();
+    expect(result.sets[1].endTime).toEqual(new Date('2025-01-01'));
+    expect(result.sets[1].duration).toBe(30);
+  });
+
+  it('adapts nested safetyChecks array when present', () => {
+    const session = {
+      ...basePrismaSession,
+      safetyChecks: [
+        { id: 'sc-1', sessionId: 'session-1', timestamp: new Date('2025-01-01'), riskLevel: 'LOW', recommendedAction: 'CONTINUE', intervention: null, notes: null },
+        { id: 'sc-2', sessionId: 'session-1', timestamp: new Date('2025-01-01'), riskLevel: 'HIGH', recommendedAction: 'PAUSE', intervention: { type: 'pause' }, notes: 'elevated distress' },
+      ],
+    };
+    const result = adaptPrismaSession(session);
+    expect(result.safetyChecks).toHaveLength(2);
+    expect(result.safetyChecks[0].intervention).toBeUndefined();
+    expect(result.safetyChecks[0].notes).toBeUndefined();
+    expect(result.safetyChecks[1].intervention).toEqual({ type: 'pause' });
+    expect(result.safetyChecks[1].notes).toBe('elevated distress');
+  });
+
   it('adapts nested user with safetyProfile when present', () => {
     const session = {
       ...basePrismaSession,

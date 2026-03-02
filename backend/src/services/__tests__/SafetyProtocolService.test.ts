@@ -808,24 +808,22 @@ describe('SafetyProtocolService', () => {
 
   describe('action determination', () => {
     it('recommends GROUNDING for MEDIUM risk', async () => {
-      // Two medium indicators: long session + medium safety profile indicator
-      const threeHoursAgo = new Date(Date.now() - 130 * 60 * 1000); // just over 2 hours
+      // SUD increase of +3 (high severity distress) produces exactly 1 high
+      // indicator which maps to MEDIUM risk.  The 130-min session adds a medium
+      // overwhelm indicator but 1 high alone already yields MEDIUM.
+      const twoHoursAgo = new Date(Date.now() - 130 * 60 * 1000);
       const session = buildMockSession({
-        currentSUD: 5,
-        initialSUD: 5,
-        startTime: threeHoursAgo,
+        currentSUD: 6,
+        initialSUD: 3,
+        startTime: twoHoursAgo,
+        sets: [{ id: 'set-1' }], // non-empty so rapid-increase check fires
       });
       mockPrismaClient.eMDRSession.findUnique.mockResolvedValue(session);
 
       const result = await service.assessCurrentState('session-1');
 
-      // One medium indicator alone doesn't reach MEDIUM risk; we need >= 2.
-      // If only one medium, it stays LOW. Let's verify the actual behavior.
-      if (result.riskLevel === RiskLevel.MEDIUM) {
-        expect(result.recommendedAction).toBe(SafetyAction.GROUNDING);
-      } else {
-        expect(result.recommendedAction).toBe(SafetyAction.CONTINUE);
-      }
+      expect(result.riskLevel).toBe(RiskLevel.MEDIUM);
+      expect(result.recommendedAction).toBe(SafetyAction.GROUNDING);
     });
 
     it('recommends PAUSE for HIGH risk with multiple distress indicators', async () => {

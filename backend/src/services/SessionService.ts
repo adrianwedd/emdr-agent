@@ -293,7 +293,7 @@ export class SessionService {
       }
 
       logger.info(`Session ${sessionId} progressed to phase: ${nextPhase}`);
-      return updatedSession as EMDRSession;
+      return adaptPrismaSession(updatedSession);
     } catch (error) {
       logger.error(`Failed to progress session ${sessionId}:`, error);
       throw prismaService.handlePrismaError(error);
@@ -769,12 +769,22 @@ export class SessionService {
     try {
       logger.debug(`Completing EMDR set ${setId} for session: ${sessionId}`);
 
+      // Fetch set and verify it belongs to this session
+      const currentSet = await this.prisma.eMDRSet.findUnique({ where: { id: setId } });
+      if (!currentSet || currentSet.sessionId !== sessionId) {
+        throw new Error(`Set ${setId} not found or does not belong to session ${sessionId}`);
+      }
+      const endTime = new Date();
+      const duration = currentSet.startTime
+        ? Math.max(0, Math.floor((endTime.getTime() - currentSet.startTime.getTime()) / 1000))
+        : null;
+
       // Update the set with completion data
       const completedSet = await this.prisma.eMDRSet.update({
         where: { id: setId },
         data: {
-          endTime: new Date(),
-          duration: null, // Will be calculated based on start/end time
+          endTime,
+          duration,
           userFeedback: setData.userFeedback || null,
           agentObservations: setData.agentObservations || null
         }
@@ -796,7 +806,7 @@ export class SessionService {
       const metrics = this.activeSessions.get(sessionId);
       if (metrics) {
         metrics.lastActivity = new Date();
-        metrics.sets += 1;
+        metrics.currentSet += 1;
       }
 
       logger.info(`EMDR set completed: ${setId} for session: ${sessionId}`);
@@ -814,9 +824,10 @@ export class SessionService {
     try {
       logger.debug(`Updating session ${sessionId} to phase: ${phase}`);
 
-      // Validate phase
-      const validPhases = ['PREPARATION', 'ASSESSMENT', 'DESENSITIZATION', 'INSTALLATION', 'BODY_SCAN', 'CLOSURE', 'REEVALUATION'];
-      if (!validPhases.includes(phase)) {
+      // Validate phase (accept both Prisma uppercase and shared lowercase values)
+      const validPhases = Object.values(EMDRPhase) as string[];
+      const normalizedPhase = phase.toLowerCase();
+      if (!validPhases.includes(normalizedPhase)) {
         throw new Error(`Invalid phase: ${phase}`);
       }
 
@@ -824,7 +835,7 @@ export class SessionService {
       const updatedSession = await this.prisma.eMDRSession.update({
         where: { id: sessionId },
         data: {
-          phase: phase as unknown as EMDRPhase, // Prisma enum ↔ shared enum cast
+          phase: normalizedPhase as unknown as EMDRPhase, // Prisma enum ↔ shared enum cast
           phaseData: phaseData || null,
           updatedAt: new Date()
         },
@@ -842,7 +853,7 @@ export class SessionService {
       const metrics = this.activeSessions.get(sessionId);
       if (metrics) {
         metrics.lastActivity = new Date();
-        metrics.phase = phase as unknown as EMDRPhase;
+        metrics.phase = normalizedPhase as unknown as EMDRPhase;
       }
 
       logger.info(`Session phase updated: ${sessionId} -> ${phase}`);
@@ -874,7 +885,7 @@ export class SessionService {
       logger.debug(`Getting sessions for user ${userId} (page: ${page}, limit: ${limit})`);
 
       // Build where clause
-      const where: any = { userId };
+      const where: Record<string, unknown> = { userId };
       if (filters?.state) {
         where.state = filters.state;
       }
