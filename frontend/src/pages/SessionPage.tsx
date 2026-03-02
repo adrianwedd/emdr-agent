@@ -1,8 +1,10 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
+import { useSafetyStore } from '../stores/safetyStore';
 import { PhaseIndicator, PHASE_ORDER, SessionControls, SessionTimer, SUDScale, VOCScale, TargetMemoryCard } from '../components/SessionManagement';
+import { SafetyStatusBar, SafetyPanel, GroundingExercise } from '../components/Safety';
 import { Button } from '../components/Common/Button';
 import { Alert } from '../components/Common/Alert';
 import { Card } from '../components/Common/Card';
@@ -24,12 +26,21 @@ export const SessionPage: React.FC = () => {
   const progressPhase = useSessionStore(s => s.progressPhase);
   const clearError = useSessionStore(s => s.clearError);
   const clearActiveSession = useSessionStore(s => s.clearActiveSession);
+  const activeGrounding = useSafetyStore(s => s.activeGrounding);
+  const groundingTechniques = useSafetyStore(s => s.groundingTechniques);
+  const startGrounding = useSafetyStore(s => s.startGrounding);
+  const completeGrounding = useSafetyStore(s => s.completeGrounding);
+  const resetSafety = useSafetyStore(s => s.reset);
+  const [showSafetyPanel, setShowSafetyPanel] = useState(false);
   const navigatingToSummary = useRef(false);
 
   useEffect(() => {
     if (id) loadSession(id);
     return () => {
-      if (!navigatingToSummary.current) clearActiveSession();
+      if (!navigatingToSummary.current) {
+        clearActiveSession();
+        resetSafety();
+      }
     };
   }, [id, loadSession, clearActiveSession]);
 
@@ -73,6 +84,13 @@ export const SessionPage: React.FC = () => {
           </div>
         </div>
       </header>
+      {activeSession && activeSession.state !== 'completed' && activeSession.state !== 'emergency_stopped' && (
+        <SafetyStatusBar
+          sessionId={activeSession.id}
+          onTogglePanel={() => setShowSafetyPanel(prev => !prev)}
+          isPanelOpen={showSafetyPanel}
+        />
+      )}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {error && <Alert variant="error" onDismiss={clearError}>{error}</Alert>}
         <Card><PhaseIndicator currentPhase={activeSession.phase || 'preparation'} /></Card>
@@ -106,6 +124,19 @@ export const SessionPage: React.FC = () => {
           </Card>
         )}
       </main>
+      {activeSession && (
+        <SafetyPanel
+          sessionId={activeSession.id}
+          isOpen={showSafetyPanel}
+          onClose={() => setShowSafetyPanel(false)}
+          onStartGrounding={startGrounding}
+        />
+      )}
+      <GroundingExercise
+        technique={groundingTechniques.find(t => t.id === activeGrounding) ?? null}
+        onComplete={(eff) => { if (activeGrounding) completeGrounding(activeGrounding, eff); }}
+        onCancel={() => { if (activeGrounding) completeGrounding(activeGrounding, 5); }}
+      />
     </div>
   );
 };
