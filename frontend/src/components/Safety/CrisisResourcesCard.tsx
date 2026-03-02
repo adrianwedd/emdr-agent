@@ -25,6 +25,12 @@ const FALLBACK_RESOURCES: CrisisResource[] = [
   },
 ];
 
+function getContactHref(resource: CrisisResource): string | null {
+  if (resource.type === 'hotline' || resource.type === 'emergency') return `tel:${resource.contact}`;
+  if (resource.type === 'text') return `sms:741741?body=HOME`;
+  return null;
+}
+
 function mergeResources(apiResources: CrisisResource[]): CrisisResource[] {
   const seen = new Set<string>(FALLBACK_RESOURCES.map((r) => r.contact));
   const extras = apiResources.filter((r) => !seen.has(r.contact));
@@ -85,13 +91,20 @@ export function CrisisResourcesCard({ resources, compact = false }: CrisisResour
       >
         <h3 className="text-sm font-semibold text-amber-900 mb-2">Crisis Resources</h3>
         <div className="flex flex-wrap gap-x-4 gap-y-2">
-          {allResources.map((resource) => (
-            <div key={resource.contact} className="flex items-center">
-              <span className="text-sm font-medium text-amber-800">{resource.name}:</span>
-              <span className="ml-1 text-sm text-amber-700">{resource.contact}</span>
-              <CopyButton contact={resource.contact} resourceName={resource.name} />
-            </div>
-          ))}
+          {allResources.map((resource) => {
+            const href = getContactHref(resource);
+            return (
+              <div key={resource.contact} className="flex items-center">
+                <span className="text-sm font-medium text-amber-800">{resource.name}:</span>
+                {href ? (
+                  <a href={href} className="ml-1 text-sm text-amber-700 underline text-amber-800 hover:text-amber-900">{resource.contact}</a>
+                ) : (
+                  <span className="ml-1 text-sm text-amber-700">{resource.contact}</span>
+                )}
+                <CopyButton contact={resource.contact} resourceName={resource.name} />
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -105,26 +118,33 @@ export function CrisisResourcesCard({ resources, compact = false }: CrisisResour
     >
       <h3 className="text-base font-semibold text-amber-900 mb-3">Crisis Resources</h3>
       <div className="flex flex-col gap-3">
-        {allResources.map((resource) => (
-          <div
-            key={resource.contact}
-            className="bg-white border border-amber-100 rounded-md p-3 shadow-sm"
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-amber-900">{resource.name}</p>
-                <div className="flex items-center mt-0.5">
-                  <span className="text-sm text-amber-800 font-mono">{resource.contact}</span>
-                  <CopyButton contact={resource.contact} resourceName={resource.name} />
+        {allResources.map((resource) => {
+          const href = getContactHref(resource);
+          return (
+            <div
+              key={resource.contact}
+              className="bg-white border border-amber-100 rounded-md p-3 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-amber-900">{resource.name}</p>
+                  <div className="flex items-center mt-0.5">
+                    {href ? (
+                      <a href={href} className="text-sm font-mono underline text-amber-800 hover:text-amber-900">{resource.contact}</a>
+                    ) : (
+                      <span className="text-sm text-amber-800 font-mono">{resource.contact}</span>
+                    )}
+                    <CopyButton contact={resource.contact} resourceName={resource.name} />
+                  </div>
+                  <p className="text-xs text-amber-700 mt-1">{resource.description}</p>
                 </div>
-                <p className="text-xs text-amber-700 mt-1">{resource.description}</p>
+                <span className="shrink-0 text-xs text-amber-600 bg-amber-100 rounded px-1.5 py-0.5">
+                  {resource.availability}
+                </span>
               </div>
-              <span className="shrink-0 text-xs text-amber-600 bg-amber-100 rounded px-1.5 py-0.5">
-                {resource.availability}
-              </span>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

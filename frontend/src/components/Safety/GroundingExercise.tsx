@@ -67,10 +67,13 @@ export function GroundingExercise({ technique, onComplete, onCancel }: Grounding
 
   function handleNeedMoreHelp() {
     setShowCrisis(true);
+  }
+
+  function handleCloseCrisis() {
+    setShowCrisis(false);
     if (!completedRef.current) {
       completedRef.current = true;
-      // Delay the completion callback so user can see crisis resources
-      setTimeout(() => onComplete(3), 800);
+      onComplete(3);
     }
   }
 
@@ -139,13 +142,11 @@ export function GroundingExercise({ technique, onComplete, onCancel }: Grounding
 
             {/* Step progress dots */}
             {instructions.length > 1 && (
-              <div className="flex items-center gap-2" role="tablist" aria-label="Step progress">
+              <div className="flex items-center gap-2" role="group" aria-label="Step progress">
                 {instructions.map((_, idx) => (
                   <div
                     key={idx}
-                    role="tab"
-                    aria-selected={idx === currentStep}
-                    aria-label={`Step ${idx + 1} of ${instructions.length}${idx === currentStep ? ', current' : ''}`}
+                    aria-hidden="true"
                     className={`rounded-full transition-all duration-200 ${
                       idx === currentStep
                         ? 'w-3 h-3 bg-therapy-focus'
@@ -207,7 +208,7 @@ export function GroundingExercise({ technique, onComplete, onCancel }: Grounding
           <div className="w-full max-w-md bg-therapy-surface rounded-xl shadow-2xl p-6 flex flex-col gap-4">
             <CrisisResourcesCard compact />
             <button
-              onClick={() => setShowCrisis(false)}
+              onClick={handleCloseCrisis}
               className="self-center px-5 py-2 rounded-lg border border-therapy-border text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-therapy-focus"
             >
               Close

@@ -45,7 +45,7 @@ export const SessionPage: React.FC = () => {
   }, [id, loadSession, clearActiveSession]);
 
   useEffect(() => {
-    if (activeSession?.state === 'completed' || activeSession?.state === 'emergency_stopped') {
+    if (activeSession?.state === 'completed') {
       navigatingToSummary.current = true;
       navigate(`/sessions/${activeSession.id}/summary`, { replace: true });
     }
@@ -84,7 +84,7 @@ export const SessionPage: React.FC = () => {
           </div>
         </div>
       </header>
-      {activeSession && activeSession.state !== 'completed' && activeSession.state !== 'emergency_stopped' && (
+      {activeSession && activeSession.state !== 'completed' && (
         <SafetyStatusBar
           sessionId={activeSession.id}
           onTogglePanel={() => setShowSafetyPanel(prev => !prev)}

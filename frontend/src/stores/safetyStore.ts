@@ -46,8 +46,8 @@ export const useSafetyStore = create<SafetyStore>()((set, get) => ({
       if (response.success && response.data) {
         set({ assessment: response.data });
       }
-    } catch (error: any) {
-      const msg = error.response?.data?.message || error.message || 'Failed to fetch safety assessment';
+    } catch (error: unknown) {
+      const msg = (error as any)?.response?.data?.message ?? (error instanceof Error ? error.message : 'Failed to fetch safety assessment');
       set({ error: msg });
     }
   },
@@ -57,13 +57,14 @@ export const useSafetyStore = create<SafetyStore>()((set, get) => ({
     try {
       const response = await safetyApi.performCheck(sessionId, reason);
       if (response.success && response.data) {
-        set({ assessment: response.data, isAssessing: false });
-        // Refresh history after new check
+        set({ assessment: response.data });
         get().fetchHistory(sessionId);
       }
-    } catch (error: any) {
-      const msg = error.response?.data?.message || error.message || 'Safety check failed. If you are in distress, call 988 or text HOME to 741741.';
-      set({ isAssessing: false, error: msg });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Safety check failed. If you are in distress, call 988 or text HOME to 741741.';
+      set({ error: msg });
+    } finally {
+      set({ isAssessing: false });
     }
   },
 
@@ -72,8 +73,8 @@ export const useSafetyStore = create<SafetyStore>()((set, get) => ({
       await safetyApi.updateMeasurements(sessionId, measurements);
       // Re-assess after measurement update
       get().fetchAssessment(sessionId);
-    } catch (error: any) {
-      const msg = error.response?.data?.message || error.message || 'Failed to update measurements';
+    } catch (error: unknown) {
+      const msg = (error as any)?.response?.data?.message ?? (error instanceof Error ? error.message : 'Failed to update measurements');
       set({ error: msg });
     }
   },
@@ -95,8 +96,9 @@ export const useSafetyStore = create<SafetyStore>()((set, get) => ({
       if (response.success && response.data) {
         set({ groundingTechniques: response.data });
       }
-    } catch (error: any) {
-      set({ error: error.message || 'Failed to load grounding techniques' });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Failed to load grounding techniques';
+      set({ error: msg });
     }
   },
 

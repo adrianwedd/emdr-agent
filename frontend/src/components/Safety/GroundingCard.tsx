@@ -20,7 +20,7 @@ function capitalize(str: string): string {
 
 export function GroundingCard({ technique, onStart }: GroundingCardProps) {
   const badgeStyle = TYPE_BADGE[technique.type] ?? 'bg-gray-100 text-gray-700';
-  const effectivenessPercent = Math.max(0, Math.min(100, technique.effectiveness));
+  const effectivenessPercent = Math.max(0, Math.min(100, Math.round(technique.effectiveness * 100)));
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm flex flex-col gap-3">

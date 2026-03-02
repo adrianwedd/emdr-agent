@@ -90,8 +90,21 @@ export const safetyApi = {
   updateMeasurements: (sessionId: string, measurements: SafetyMeasurements): Promise<ApiResponse> =>
     api.put(`/safety/measurements/${sessionId}`, measurements),
 
-  getHistory: (sessionId: string): Promise<ApiResponse<SafetyCheck[]>> =>
-    api.get(`/safety/history/${sessionId}`),
+  getHistory: async (sessionId: string): Promise<ApiResponse<SafetyCheck[]>> => {
+    const response = await api.get<any>(`/safety/history/${sessionId}`);
+    if (response.success && response.data) {
+      response.data = response.data.map((check: any) => ({
+        id: check.id,
+        sessionId: check.sessionId,
+        type: check.checkType ?? check.type ?? 'UNKNOWN',
+        riskLevel: check.measurements?.riskLevel ?? check.riskLevel ?? 'LOW',
+        action: check.action ?? check.measurements?.action ?? '',
+        details: check.measurements ?? check.details,
+        createdAt: check.timestamp ?? check.createdAt,
+      }));
+    }
+    return response;
+  },
 
   triggerEmergency: (sessionId: string, reason: string, severity?: string): Promise<ApiResponse<EmergencyResult>> =>
     api.post('/safety/emergency', { sessionId, reason, severity }),
