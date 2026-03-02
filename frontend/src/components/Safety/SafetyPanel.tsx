@@ -44,22 +44,31 @@ export function SafetyPanel({
   const crisisResources = useSafetyStore((s) => s.crisisResources);
   const fetchHistory = useSafetyStore((s) => s.fetchHistory);
   const fetchGroundingTechniques = useSafetyStore((s) => s.fetchGroundingTechniques);
+  const fetchCrisisResources = useSafetyStore((s) => s.fetchCrisisResources);
 
   // Track whether the panel has been opened at least once
   const hasOpenedRef = useRef(false);
+
+  // Reset the guard whenever the session changes so data is refreshed for the new session
+  useEffect(() => {
+    hasOpenedRef.current = false;
+  }, [sessionId]);
 
   useEffect(() => {
     if (isOpen && !hasOpenedRef.current) {
       hasOpenedRef.current = true;
       fetchHistory(sessionId);
       fetchGroundingTechniques();
+      fetchCrisisResources();
     }
-  }, [isOpen, sessionId, fetchHistory, fetchGroundingTechniques]);
+  }, [isOpen, sessionId, fetchHistory, fetchGroundingTechniques, fetchCrisisResources]);
 
   return (
     <motion.div
       role="complementary"
       aria-label="Safety monitoring panel"
+      aria-hidden={!isOpen}
+      {...(!isOpen ? { inert: '' } : {})}
       className="fixed top-0 right-0 h-full w-96 bg-white shadow-xl z-40 overflow-y-auto flex flex-col"
       initial={{ x: '100%' }}
       animate={{ x: isOpen ? 0 : '100%' }}

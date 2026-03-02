@@ -27,8 +27,6 @@ export function SUDSparkline({
         height={height}
         viewBox={`0 0 ${width} ${height}`}
         aria-hidden="true"
-        role="img"
-        aria-label="No SUD data"
       >
         <line
           x1={0}
@@ -56,8 +54,6 @@ export function SUDSparkline({
         height={height}
         viewBox={`0 0 ${width} ${height}`}
         aria-hidden="true"
-        role="img"
-        aria-label={`SUD level ${lastValue}`}
       >
         <line
           x1={width * 0.25}
@@ -89,8 +85,6 @@ export function SUDSparkline({
       height={height}
       viewBox={`0 0 ${width} ${height}`}
       aria-hidden="true"
-      role="img"
-      aria-label={`SUD trend over ${values.length} readings, current: ${lastValue}`}
     >
       <polyline
         points={points}

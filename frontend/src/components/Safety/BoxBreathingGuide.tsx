@@ -39,7 +39,18 @@ const RADIUS = 80;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 export function BoxBreathingGuide({ onComplete }: BoxBreathingGuideProps) {
-  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setPrefersReducedMotion(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  // Keep a stable ref to onComplete so the interval effect never needs to re-run
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => { onCompleteRef.current = onComplete; });
 
   // tick: total seconds elapsed within a single phase (0 to PHASE_DURATION-1)
   // phaseIndex: index into PHASES array (0-3)
@@ -48,6 +59,7 @@ export function BoxBreathingGuide({ onComplete }: BoxBreathingGuideProps) {
   const [phaseIndex, setPhaseIndex] = useState(0);
   const [cycleCount, setCycleCount] = useState(0);
   const completedRef = useRef(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   const currentPhase = PHASES[phaseIndex];
   const colors = PHASE_COLORS[currentPhase];
@@ -79,7 +91,7 @@ export function BoxBreathingGuide({ onComplete }: BoxBreathingGuideProps) {
                   completedRef.current = true;
                   clearInterval(interval);
                   // Defer onComplete so state updates settle first
-                  setTimeout(onComplete, 500);
+                  timeoutRef.current = setTimeout(() => onCompleteRef.current(), 500);
                 }
                 return newCycles;
               });
@@ -95,8 +107,11 @@ export function BoxBreathingGuide({ onComplete }: BoxBreathingGuideProps) {
       });
     }, 1000);
 
-    return () => clearInterval(interval);
-  }, [onComplete]);
+    return () => {
+      clearInterval(interval);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []); // stable — no deps needed
 
   const displayCycle = Math.min(cycleCount + 1, TOTAL_CYCLES);
 
