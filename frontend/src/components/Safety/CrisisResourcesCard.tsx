@@ -97,7 +97,7 @@ export function CrisisResourcesCard({ resources, compact = false }: CrisisResour
               <div key={resource.contact} className="flex items-center">
                 <span className="text-sm font-medium text-amber-800">{resource.name}:</span>
                 {href ? (
-                  <a href={href} className="ml-1 text-sm text-amber-700 underline text-amber-800 hover:text-amber-900">{resource.contact}</a>
+                  <a href={href} className="ml-1 text-sm underline text-amber-800 hover:text-amber-900">{resource.contact}</a>
                 ) : (
                   <span className="ml-1 text-sm text-amber-700">{resource.contact}</span>
                 )}

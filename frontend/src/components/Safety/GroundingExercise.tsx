@@ -71,10 +71,7 @@ export function GroundingExercise({ technique, onComplete, onCancel }: Grounding
 
   function handleCloseCrisis() {
     setShowCrisis(false);
-    if (!completedRef.current) {
-      completedRef.current = true;
-      onComplete(3);
-    }
+    // Do not call onComplete — user may want to continue the exercise
   }
 
   return (

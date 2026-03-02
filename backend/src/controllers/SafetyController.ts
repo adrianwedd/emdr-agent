@@ -24,7 +24,9 @@ export class SafetyController {
         });
       }
 
-      const safetyCheck = await safetyProtocolService.assessCurrentState(sessionId);
+      const safetyCheck = reason
+        ? await safetyProtocolService.triggerManualCheck(sessionId, reason)
+        : await safetyProtocolService.assessCurrentState(sessionId);
 
       return res.json({
         success: true,

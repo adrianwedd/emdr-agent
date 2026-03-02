@@ -61,7 +61,7 @@ export const useSafetyStore = create<SafetyStore>()((set, get) => ({
         get().fetchHistory(sessionId);
       }
     } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : 'Safety check failed. If you are in distress, call 988 or text HOME to 741741.';
+      const msg = (error as any)?.response?.data?.message ?? (error instanceof Error ? error.message : 'Safety check failed. If you are in distress, call 988 or text HOME to 741741.');
       set({ error: msg });
     } finally {
       set({ isAssessing: false });
