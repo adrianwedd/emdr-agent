@@ -825,17 +825,21 @@ export class SessionService {
       logger.debug(`Updating session ${sessionId} to phase: ${phase}`);
 
       // Validate phase (accept both Prisma uppercase and shared lowercase values)
-      const validPhases = Object.values(EMDRPhase) as string[];
       const normalizedPhase = phase.toLowerCase();
-      if (!validPhases.includes(normalizedPhase)) {
+      const phaseEntry = Object.entries(EMDRPhase).find(
+        ([, value]) => value === normalizedPhase
+      );
+      if (!phaseEntry) {
         throw new Error(`Invalid phase: ${phase}`);
       }
+      // Prisma DB enum expects UPPERCASE keys (PREPARATION, ASSESSMENT, etc.)
+      const prismaPhase = phaseEntry[0];
 
       // Update session phase
       const updatedSession = await this.prisma.eMDRSession.update({
         where: { id: sessionId },
         data: {
-          phase: normalizedPhase as unknown as EMDRPhase, // Prisma enum ↔ shared enum cast
+          phase: prismaPhase as unknown as EMDRPhase, // Prisma enum key (UPPERCASE)
           phaseData: phaseData || null,
           updatedAt: new Date()
         },

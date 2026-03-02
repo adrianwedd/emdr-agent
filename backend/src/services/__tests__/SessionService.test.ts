@@ -898,7 +898,7 @@ describe('SessionService', () => {
         expect.objectContaining({
           where: { id: 'session-1' },
           data: expect.objectContaining({
-            phase: 'desensitization',
+            phase: 'DESENSITIZATION',
             phaseData: { note: 'test' },
           }),
         })
