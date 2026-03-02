@@ -61,3 +61,4 @@ Dockerfile*
 # Prisma
 prisma/migrations/
 !prisma/migrations/.gitkeep
+.worktrees/
