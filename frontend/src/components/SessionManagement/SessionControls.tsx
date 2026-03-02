@@ -70,7 +70,7 @@ export const SessionControls: React.FC<SessionControlsProps> = ({
         </>
       )}
 
-      {!isFinished && !isPreparing && (
+      {!isFinished && (
         <motion.div className="ml-auto" whileHover={{ scale: 1.05 }}>
           <Button variant="danger" size="lg" onClick={() => setShowEmergencyModal(true)} className="shadow-lg">
             <AlertOctagon className="w-5 h-5 mr-2" />
@@ -82,7 +82,16 @@ export const SessionControls: React.FC<SessionControlsProps> = ({
       <Modal open={showEmergencyModal} onClose={() => setShowEmergencyModal(false)} title="Emergency Stop" size="sm">
         <div className="space-y-4">
           <p className="text-sm text-gray-600">This will immediately end the session. You can optionally provide a reason.</p>
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <p className="text-sm font-medium text-amber-900 mb-1">If you are in distress:</p>
+            <ul className="text-sm text-amber-800 space-y-0.5">
+              <li>Call <strong>988</strong> (Suicide & Crisis Lifeline)</li>
+              <li>Text <strong>HOME</strong> to <strong>741741</strong> (Crisis Text Line)</li>
+            </ul>
+          </div>
           <textarea
+            id="emergency-reason"
+            aria-label="Emergency stop reason"
             className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500"
             placeholder="Reason (optional)..."
             rows={3}
@@ -102,6 +111,8 @@ export const SessionControls: React.FC<SessionControlsProps> = ({
         <div className="space-y-4">
           <p className="text-sm text-gray-600">End this therapy session. Add any notes below.</p>
           <textarea
+            id="completion-notes"
+            aria-label="Session completion notes"
             className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-therapy-accent focus:border-therapy-accent"
             placeholder="Session notes (optional)..."
             rows={4}

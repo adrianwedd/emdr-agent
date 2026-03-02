@@ -46,8 +46,9 @@ export const TargetMemoryForm: React.FC<TargetMemoryFormProps> = ({ onSubmit, is
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-900">Target Memory</h3>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Describe the memory or image</label>
+          <label htmlFor="memory-description" className="block text-sm font-medium text-gray-700 mb-1">Describe the memory or image</label>
           <textarea
+            id="memory-description"
             {...register('description')}
             className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-therapy-accent focus:border-therapy-accent"
             rows={3}

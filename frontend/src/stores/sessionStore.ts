@@ -14,8 +14,6 @@ interface SessionStore {
   // Timer state
   elapsed: number;
   phaseElapsed: number;
-  timerInterval: ReturnType<typeof setInterval> | null;
-
   // Session CRUD
   createSession: (data: CreateSessionData) => Promise<string>;
   loadSession: (id: string) => Promise<void>;
@@ -45,6 +43,8 @@ interface SessionStore {
   clearActiveSession: () => void;
 }
 
+let _timerInterval: ReturnType<typeof setInterval> | null = null;
+
 export const useSessionStore = create<SessionStore>()((set, get) => ({
   sessions: [],
   activeSession: null,
@@ -55,8 +55,6 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
   error: null,
   elapsed: 0,
   phaseElapsed: 0,
-  timerInterval: null,
-
   createSession: async (data) => {
     set({ isLoading: true, error: null });
     try {
@@ -79,6 +77,12 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
       const response = await sessionApi.getById(id);
       if (response.success && response.data) {
         set({ activeSession: response.data, isLoading: false });
+        const session = response.data;
+        if (session.startTime) {
+          const elapsed = Math.max(0, Math.floor((Date.now() - new Date(session.startTime).getTime()) / 1000));
+          set({ elapsed });
+        }
+        if (session.state === 'in_progress') get().startTimer();
         return;
       }
       throw new Error(response.message || 'Failed to load session');
@@ -97,9 +101,9 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
         const data = response.data;
         set({
           sessions: data.sessions,
-          totalSessions: data.total,
-          currentPage: data.page,
-          totalPages: data.totalPages,
+          totalSessions: data.pagination.total,
+          currentPage: data.pagination.page,
+          totalPages: data.pagination.totalPages,
           isLoading: false,
         });
         return;
@@ -178,6 +182,7 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
   emergencyStop: async (reason) => {
     const session = get().activeSession;
     if (!session) return;
+    set({ isLoading: true, error: null });
     try {
       const response = await sessionApi.emergencyStop(session.id, reason);
       if (response.success && response.data) {
@@ -185,8 +190,8 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
         get().stopTimer();
       }
     } catch (error: any) {
-      const msg = error.response?.data?.message || error.message || 'Emergency stop failed';
-      set({ error: msg });
+      const msg = error.response?.data?.message || error.message || 'Emergency stop failed. If you are in distress, call 988 or text HOME to 741741.';
+      set({ isLoading: false, error: msg });
     }
   },
 
@@ -236,21 +241,18 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
   },
 
   startTimer: () => {
-    const existing = get().timerInterval;
-    if (existing) clearInterval(existing);
-    const interval = setInterval(() => {
+    if (_timerInterval) clearInterval(_timerInterval);
+    _timerInterval = setInterval(() => {
       set((state) => ({
         elapsed: state.elapsed + 1,
         phaseElapsed: state.phaseElapsed + 1,
       }));
     }, 1000);
-    set({ timerInterval: interval });
   },
 
   stopTimer: () => {
-    const interval = get().timerInterval;
-    if (interval) clearInterval(interval);
-    set({ timerInterval: null });
+    if (_timerInterval) clearInterval(_timerInterval);
+    _timerInterval = null;
   },
 
   resetTimer: () => {

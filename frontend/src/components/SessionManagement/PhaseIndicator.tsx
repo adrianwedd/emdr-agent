@@ -13,6 +13,8 @@ const PHASES = [
   { key: 'resource_installation', label: 'Resources', short: '8' },
 ] as const;
 
+export const PHASE_ORDER = PHASES.map(p => p.key);
+
 interface PhaseIndicatorProps {
   currentPhase: string;
   completedPhases?: string[];
@@ -26,14 +28,14 @@ export const PhaseIndicator: React.FC<PhaseIndicatorProps> = ({
 
   return (
     <div className="w-full px-2">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between" role="list" aria-label="EMDR therapy phases">
         {PHASES.map((phase, index) => {
           const isCompleted = completedPhases.includes(phase.key) || index < currentIndex;
           const isCurrent = phase.key === currentPhase.toLowerCase();
 
           return (
             <React.Fragment key={phase.key}>
-              <div className="flex flex-col items-center relative">
+              <div className="flex flex-col items-center relative" role="listitem">
                 <motion.div
                   className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium border-2 transition-colors ${
                     isCurrent
@@ -42,6 +44,7 @@ export const PhaseIndicator: React.FC<PhaseIndicatorProps> = ({
                       ? 'border-therapy-safe bg-therapy-safe text-white'
                       : 'border-therapy-border bg-therapy-surface text-therapy-muted'
                   }`}
+                  aria-current={isCurrent ? 'step' : undefined}
                   animate={isCurrent ? { scale: [1, 1.1, 1] } : {}}
                   transition={isCurrent ? { duration: 2, repeat: Infinity, ease: 'easeInOut' } : {}}
                 >

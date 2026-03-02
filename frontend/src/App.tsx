@@ -5,6 +5,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { NewSessionPage } from './pages/NewSessionPage';
 import { SessionPage } from './pages/SessionPage';
 import { SessionSummaryPage } from './pages/SessionSummaryPage';
+import { ErrorBoundary } from './components/Common/ErrorBoundary';
 import './App.css';
 
 const LandingPage = () => (
@@ -39,9 +40,9 @@ function App() {
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/landing" element={<LandingPage />} />
         <Route path="/" element={<ProtectedRoute fallback={<AuthPage />}><DashboardPage /></ProtectedRoute>} />
-        <Route path="/sessions/new" element={<ProtectedRoute fallback={<AuthPage />}><NewSessionPage /></ProtectedRoute>} />
-        <Route path="/sessions/:id" element={<ProtectedRoute fallback={<AuthPage />}><SessionPage /></ProtectedRoute>} />
-        <Route path="/sessions/:id/summary" element={<ProtectedRoute fallback={<AuthPage />}><SessionSummaryPage /></ProtectedRoute>} />
+        <Route path="/sessions/new" element={<ProtectedRoute fallback={<AuthPage />}><ErrorBoundary><NewSessionPage /></ErrorBoundary></ProtectedRoute>} />
+        <Route path="/sessions/:id" element={<ProtectedRoute fallback={<AuthPage />}><ErrorBoundary><SessionPage /></ErrorBoundary></ProtectedRoute>} />
+        <Route path="/sessions/:id/summary" element={<ProtectedRoute fallback={<AuthPage />}><ErrorBoundary><SessionSummaryPage /></ErrorBoundary></ProtectedRoute>} />
       </Routes>
     </Router>
   );

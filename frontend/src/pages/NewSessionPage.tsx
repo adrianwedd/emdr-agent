@@ -9,7 +9,10 @@ import { Alert } from '../components/Common/Alert';
 
 export const NewSessionPage: React.FC = () => {
   const navigate = useNavigate();
-  const { createSession, isLoading, error, clearError } = useSessionStore();
+  const createSession = useSessionStore(s => s.createSession);
+  const isLoading = useSessionStore(s => s.isLoading);
+  const error = useSessionStore(s => s.error);
+  const clearError = useSessionStore(s => s.clearError);
 
   const handleSubmit = async (data: {
     description: string; negativeCognition: string; positiveCognition: string;

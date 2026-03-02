@@ -24,6 +24,16 @@ export function nullToUndefined<T extends Record<string, unknown>>(
   return result as any;
 }
 
+const SESSION_STATE_MAP: Record<string, string> = {
+  PREPARING: 'preparing', IN_PROGRESS: 'in_progress', PAUSED: 'paused',
+  COMPLETED: 'completed', EMERGENCY_STOPPED: 'emergency_stopped',
+};
+const EMDR_PHASE_MAP: Record<string, string> = {
+  PREPARATION: 'preparation', ASSESSMENT: 'assessment', DESENSITIZATION: 'desensitization',
+  INSTALLATION: 'installation', BODY_SCAN: 'body_scan', CLOSURE: 'closure',
+  REEVALUATION: 'reevaluation', RESOURCE_INSTALLATION: 'resource_installation',
+};
+
 /**
  * Adapts a Prisma EMDRSession row (and optional nested relations) so that
  * all `null` values become `undefined`.
@@ -35,6 +45,13 @@ export function nullToUndefined<T extends Record<string, unknown>>(
  */
 export function adaptPrismaSession<T extends Record<string, unknown>>(prismaSession: T): any {
   const adapted: Record<string, unknown> = { ...nullToUndefined(prismaSession) };
+
+  if (typeof adapted.state === 'string' && SESSION_STATE_MAP[adapted.state]) {
+    adapted.state = SESSION_STATE_MAP[adapted.state];
+  }
+  if (typeof adapted.phase === 'string' && EMDR_PHASE_MAP[adapted.phase]) {
+    adapted.phase = EMDR_PHASE_MAP[adapted.phase];
+  }
 
   if (prismaSession.targetMemory && typeof prismaSession.targetMemory === 'object') {
     adapted.targetMemory = nullToUndefined(prismaSession.targetMemory as Record<string, unknown>);

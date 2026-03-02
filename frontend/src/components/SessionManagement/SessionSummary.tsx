@@ -47,7 +47,7 @@ export const SessionSummary: React.FC<SessionSummaryProps> = ({ session, elapsed
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
           <Clock className="w-5 h-5 text-indigo-600 mx-auto mb-1" />
-          <div className="text-2xl font-bold text-gray-900">{formatDuration(session.totalDuration || elapsed)}</div>
+          <div className="text-2xl font-bold text-gray-900">{formatDuration(session.totalDuration ?? elapsed)}</div>
           <div className="text-xs text-therapy-muted">Duration</div>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">

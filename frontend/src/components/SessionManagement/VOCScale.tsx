@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { motion } from 'framer-motion';
 
 const VOC_LABELS: Record<number, string> = {
@@ -22,16 +22,17 @@ interface VOCScaleProps {
 export const VOCScale: React.FC<VOCScaleProps> = ({
   value, onChange, disabled = false, label = 'Validity of Cognition (VOC)', cognition,
 }) => {
+  const labelId = useId();
   return (
     <div className="space-y-3">
       <div>
-        <label className="text-sm font-medium text-gray-700">{label}</label>
+        <label id={labelId} className="text-sm font-medium text-gray-700">{label}</label>
         {cognition && <p className="text-sm text-therapy-muted italic mt-1">"{cognition}"</p>}
       </div>
       {value !== undefined && (
         <p className="text-sm text-gray-500">{value} — {VOC_LABELS[value]}</p>
       )}
-      <div className="flex gap-2">
+      <div className="flex gap-2" role="radiogroup" aria-labelledby={labelId}>
         {Array.from({ length: 7 }, (_, i) => {
           const level = i + 1;
           return (

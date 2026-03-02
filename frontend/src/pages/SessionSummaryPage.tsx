@@ -8,7 +8,10 @@ import { Button } from '../components/Common/Button';
 export const SessionSummaryPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { activeSession, isLoading, elapsed, loadSession } = useSessionStore();
+  const activeSession = useSessionStore(s => s.activeSession);
+  const isLoading = useSessionStore(s => s.isLoading);
+  const elapsed = useSessionStore(s => s.elapsed);
+  const loadSession = useSessionStore(s => s.loadSession);
 
   useEffect(() => { if (id) loadSession(id); }, [id, loadSession]);
 

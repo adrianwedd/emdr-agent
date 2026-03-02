@@ -47,9 +47,12 @@ export interface SessionDetail extends SessionListItem {
 
 export interface PaginatedSessions {
   sessions: SessionListItem[];
-  total: number;
-  page: number;
-  totalPages: number;
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 }
 
 export interface CreateSessionData {
@@ -66,10 +69,8 @@ export interface CreateSessionData {
 
 export interface SetFeedback {
   sudLevel?: number;
-  bodyResponse?: string;
-  imagery?: string;
-  thoughts?: string;
-  emotions?: string;
+  vocLevel?: number;
+  notes?: string;
 }
 
 export const sessionApi = {
@@ -107,5 +108,5 @@ export const sessionApi = {
     api.post(`/sessions/${id}/sets`, { stimulationSettings }),
 
   completeSet: (id: string, setId: string, feedback?: SetFeedback): Promise<ApiResponse> =>
-    api.put(`/sessions/${id}/sets/${setId}`, feedback),
+    api.put(`/sessions/${id}/sets/${setId}`, feedback ? { userFeedback: feedback } : undefined),
 };

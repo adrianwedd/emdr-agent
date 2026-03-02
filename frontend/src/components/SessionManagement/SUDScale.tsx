@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { motion } from 'framer-motion';
 
 const SUD_LABELS: Record<number, string> = {
@@ -22,15 +22,16 @@ interface SUDScaleProps {
 export const SUDScale: React.FC<SUDScaleProps> = ({
   value, onChange, disabled = false, label = 'Subjective Units of Distress (SUD)',
 }) => {
+  const labelId = useId();
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <label className="text-sm font-medium text-gray-700">{label}</label>
+        <label id={labelId} className="text-sm font-medium text-gray-700">{label}</label>
         {value !== undefined && (
           <span className="text-sm text-gray-500">{value} — {SUD_LABELS[value]}</span>
         )}
       </div>
-      <div className="flex gap-1.5">
+      <div className="flex gap-1.5" role="radiogroup" aria-labelledby={labelId}>
         {Array.from({ length: 11 }, (_, i) => (
           <motion.button
             key={i}

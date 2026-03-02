@@ -1,36 +1,54 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
-import { PhaseIndicator, SessionControls, SessionTimer, SUDScale, VOCScale, TargetMemoryCard } from '../components/SessionManagement';
+import { PhaseIndicator, PHASE_ORDER, SessionControls, SessionTimer, SUDScale, VOCScale, TargetMemoryCard } from '../components/SessionManagement';
 import { Button } from '../components/Common/Button';
 import { Alert } from '../components/Common/Alert';
 import { Card } from '../components/Common/Card';
 
-const PHASE_ORDER = [
-  'preparation', 'assessment', 'desensitization', 'installation',
-  'body_scan', 'closure', 'reevaluation', 'resource_installation',
-];
-
 export const SessionPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const {
-    activeSession, isLoading, error, elapsed, phaseElapsed,
-    loadSession, startSession, pauseSession, resumeSession,
-    completeSession, emergencyStop, progressPhase, clearError, clearActiveSession,
-  } = useSessionStore();
+  const activeSession = useSessionStore(s => s.activeSession);
+  const isLoading = useSessionStore(s => s.isLoading);
+  const error = useSessionStore(s => s.error);
+  const elapsed = useSessionStore(s => s.elapsed);
+  const phaseElapsed = useSessionStore(s => s.phaseElapsed);
+  const loadSession = useSessionStore(s => s.loadSession);
+  const startSession = useSessionStore(s => s.startSession);
+  const pauseSession = useSessionStore(s => s.pauseSession);
+  const resumeSession = useSessionStore(s => s.resumeSession);
+  const completeSession = useSessionStore(s => s.completeSession);
+  const emergencyStop = useSessionStore(s => s.emergencyStop);
+  const progressPhase = useSessionStore(s => s.progressPhase);
+  const clearError = useSessionStore(s => s.clearError);
+  const clearActiveSession = useSessionStore(s => s.clearActiveSession);
+  const navigatingToSummary = useRef(false);
 
   useEffect(() => {
     if (id) loadSession(id);
-    return () => clearActiveSession();
+    return () => {
+      if (!navigatingToSummary.current) clearActiveSession();
+    };
   }, [id, loadSession, clearActiveSession]);
 
   useEffect(() => {
     if (activeSession?.state === 'completed' || activeSession?.state === 'emergency_stopped') {
+      navigatingToSummary.current = true;
       navigate(`/sessions/${activeSession.id}/summary`, { replace: true });
     }
   }, [activeSession?.state, activeSession?.id, navigate]);
+
+  useEffect(() => {
+    const state = activeSession?.state;
+    if (state !== 'in_progress' && state !== 'paused') return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [activeSession?.state]);
 
   if (!activeSession && isLoading) {
     return <div className="min-h-screen bg-therapy-bg flex items-center justify-center"><div className="text-therapy-muted">Loading session...</div></div>;

@@ -15,7 +15,14 @@ import { SessionState } from '@prisma/client';
 
 export interface CreateSessionData {
   userId: string;
-  targetMemoryId: string;
+  targetMemoryId?: string;
+  targetMemory?: {
+    description: string;
+    negativeCognition: string;
+    positiveCognition: string;
+    emotion: string;
+    bodyLocation?: string;
+  };
   initialSUD: number;
   initialVOC: number;
   preparationNotes?: string;
@@ -95,7 +102,7 @@ export class SessionService {
    */
   public async createSession(data: CreateSessionData): Promise<EMDRSession> {
     try {
-      logger.debug(`Creating session for user ${data.userId} with memory ${data.targetMemoryId}`);
+      logger.debug(`Creating session for user ${data.userId} with memory ${data.targetMemoryId || '(inline)'}`);
 
       // Validate SUD and VOC ranges
       if (data.initialSUD < 0 || data.initialSUD > 10) {
@@ -105,10 +112,28 @@ export class SessionService {
         throw new Error('Initial VOC must be between 1 and 7');
       }
 
+      // Create inline target memory if provided
+      let targetMemoryId = data.targetMemoryId;
+      if (!targetMemoryId && data.targetMemory) {
+        const created = await this.prisma.targetMemory.create({
+          data: {
+            userId: data.userId,
+            description: data.targetMemory.description,
+            negativeCognition: data.targetMemory.negativeCognition,
+            positiveCognition: data.targetMemory.positiveCognition,
+            emotion: data.targetMemory.emotion,
+            bodyLocation: data.targetMemory.bodyLocation,
+            initialSUD: data.initialSUD,
+            initialVOC: data.initialVOC,
+          },
+        });
+        targetMemoryId = created.id;
+      }
+
       // Verify target memory exists and belongs to user
       const targetMemory = await this.prisma.targetMemory.findFirst({
         where: {
-          id: data.targetMemoryId,
+          id: targetMemoryId,
           userId: data.userId,
           isActive: true
         }
@@ -136,7 +161,7 @@ export class SessionService {
       const session = await this.prisma.eMDRSession.create({
         data: {
           userId: data.userId,
-          targetMemoryId: data.targetMemoryId,
+          targetMemoryId: targetMemoryId!,
           phase: EMDRPhase.PREPARATION,
           state: SessionState.PREPARING,
           initialSUD: data.initialSUD,

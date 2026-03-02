@@ -21,7 +21,7 @@ export default {
           bg: '#f8fafc',
           surface: '#ffffff',
           border: '#e2e8f0',
-          muted: '#94a3b8',
+          muted: '#64748b',
           accent: '#6366f1',
         },
         sud: {

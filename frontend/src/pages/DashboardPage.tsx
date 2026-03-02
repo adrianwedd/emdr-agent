@@ -9,7 +9,10 @@ import { Card } from '../components/Common/Card';
 
 export const DashboardPage: React.FC = () => {
   const { user, logout } = useAuthStore();
-  const { sessions, totalSessions, isLoading, loadUserSessions } = useSessionStore();
+  const sessions = useSessionStore(s => s.sessions);
+  const totalSessions = useSessionStore(s => s.totalSessions);
+  const isLoading = useSessionStore(s => s.isLoading);
+  const loadUserSessions = useSessionStore(s => s.loadUserSessions);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -94,9 +97,9 @@ export const DashboardPage: React.FC = () => {
               {sessions.map((session) => {
                 const state = stateLabel(session.state);
                 return (
-                  <motion.div
+                  <motion.button
                     key={session.id}
-                    className="py-4 flex items-center justify-between hover:bg-gray-50 -mx-6 px-6 cursor-pointer transition-colors"
+                    className="text-left w-full py-4 flex items-center justify-between hover:bg-gray-50 -mx-6 px-6 cursor-pointer transition-colors"
                     onClick={() => {
                       const route = session.state === 'completed' || session.state === 'emergency_stopped'
                         ? `/sessions/${session.id}/summary` : `/sessions/${session.id}`;
@@ -113,10 +116,10 @@ export const DashboardPage: React.FC = () => {
                       <div className="text-sm text-therapy-muted">{formatDate(session.createdAt)} · Phase: {session.phase}</div>
                     </div>
                     <div className="flex items-center gap-3">
-                      {session.currentSUD !== undefined && <span className="text-sm text-gray-600">SUD: {session.currentSUD}</span>}
+                      {session.currentSUD != null && <span className="text-sm text-gray-600">SUD: {session.currentSUD}</span>}
                       <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${state.color}`}>{state.text}</span>
                     </div>
-                  </motion.div>
+                  </motion.button>
                 );
               })}
             </div>
