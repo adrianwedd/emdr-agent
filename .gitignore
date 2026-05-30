@@ -62,3 +62,9 @@ Dockerfile*
 prisma/migrations/
 !prisma/migrations/.gitkeep
 .worktrees/
+
+.afterwords
+
+# Package manager: project standardizes on npm (single root package-lock.json).
+# Prevent stray pnpm lockfiles from being reintroduced.
+pnpm-lock.yaml
