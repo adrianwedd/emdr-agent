@@ -54,11 +54,12 @@ jest.mock('../../utils/logger', () => ({
   },
 }));
 
-// Type adapters: pass-through mocks
+// Type adapters: pass-through mocks (toPrismaPhase uppercases, like the real impl)
 jest.mock('../../utils/typeAdapters', () => ({
   adaptPrismaSession: jest.fn((s: unknown) => s),
   adaptPrismaSessions: jest.fn((arr: unknown[]) => arr),
   adaptPrismaSet: jest.fn((s: unknown) => s),
+  toPrismaPhase: jest.fn((p: unknown) => (typeof p === 'string' ? p.toUpperCase() : p)),
 }));
 
 // Mock @prisma/client SessionState enum
@@ -428,16 +429,35 @@ describe('SessionService', () => {
 
       const result = await service.progressToNextPhase('session-1');
 
+      // The DB enum column expects the UPPERCASE Prisma key, not the shared
+      // lowercase value — guards against the lowercase-write regression.
       expect(mockPrismaClient.eMDRSession.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'session-1' },
           data: expect.objectContaining({
-            phase: EMDRPhase.ASSESSMENT,
+            phase: 'ASSESSMENT',
             currentSetNumber: 0,
           }),
         })
       );
       expect(result.phase).toBe(EMDRPhase.ASSESSMENT);
+    });
+
+    it('writes the UPPERCASE Prisma phase key when Prisma returns an uppercase phase', async () => {
+      // Real Prisma returns the uppercase enum value; getSession() lowercases it
+      // via adaptPrismaSession (mocked pass-through here), so model the post-adapter
+      // lowercase value the service actually operates on.
+      const session = buildMockSession({ phase: EMDRPhase.PREPARATION, currentSUD: 5 });
+      mockPrismaClient.eMDRSession.findUnique.mockResolvedValue(session);
+      mockPrismaClient.eMDRSession.update.mockResolvedValue(
+        buildMockSession({ phase: EMDRPhase.ASSESSMENT })
+      );
+
+      await service.progressToNextPhase('session-1');
+
+      const writtenPhase = mockPrismaClient.eMDRSession.update.mock.calls[0][0].data.phase;
+      expect(writtenPhase).toBe('ASSESSMENT');
+      expect(writtenPhase).not.toBe('assessment');
     });
 
     it('progresses from ASSESSMENT to DESENSITIZATION when SUD > 0', async () => {
@@ -586,6 +606,75 @@ describe('SessionService', () => {
           }),
         })
       );
+    });
+  });
+
+  // =========================================================================
+  // startSet
+  // =========================================================================
+
+  describe('startSet', () => {
+    const stimulationSettings = {
+      type: 'VISUAL',
+      speed: 1.0,
+      intensity: 0.5,
+      duration: 30,
+    };
+
+    it('creates a set when the session is in progress', async () => {
+      // getSession() returns adapter-normalized state, so the guard sees the
+      // shared lowercase 'in_progress' (not Prisma's 'IN_PROGRESS').
+      mockPrismaClient.eMDRSession.findUnique.mockResolvedValue(
+        buildMockSession({ state: 'in_progress', currentSetNumber: 0 })
+      );
+      (safetyProtocolService.assessCurrentState as jest.Mock).mockResolvedValue({
+        recommendedAction: 'CONTINUE',
+      });
+      const createdSet = { id: 'set-1', sessionId: 'session-1', setNumber: 1 };
+      mockPrismaClient.eMDRSet.create.mockResolvedValue(createdSet);
+      mockPrismaClient.eMDRSession.update.mockResolvedValue(buildMockSession());
+
+      const result = await service.startSet('session-1', { stimulationSettings } as any);
+
+      expect(mockPrismaClient.eMDRSet.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ sessionId: 'session-1', setNumber: 1 }),
+        })
+      );
+      expect(result).toBe(createdSet);
+    });
+
+    it('throws when the session is not in progress', async () => {
+      mockPrismaClient.eMDRSession.findUnique.mockResolvedValue(
+        buildMockSession({ state: 'preparing' })
+      );
+
+      await expect(
+        service.startSet('session-1', { stimulationSettings } as any)
+      ).rejects.toThrow('Session must be in progress to start a set');
+      expect(mockPrismaClient.eMDRSet.create).not.toHaveBeenCalled();
+    });
+
+    it('throws when the session is not found', async () => {
+      mockPrismaClient.eMDRSession.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.startSet('nonexistent', { stimulationSettings } as any)
+      ).rejects.toThrow('Session not found');
+    });
+
+    it('throws when safety assessment recommends an emergency stop', async () => {
+      mockPrismaClient.eMDRSession.findUnique.mockResolvedValue(
+        buildMockSession({ state: 'in_progress' })
+      );
+      (safetyProtocolService.assessCurrentState as jest.Mock).mockResolvedValue({
+        recommendedAction: 'EMERGENCY_STOP',
+      });
+
+      await expect(
+        service.startSet('session-1', { stimulationSettings } as any)
+      ).rejects.toThrow('Cannot start set due to safety concerns');
+      expect(mockPrismaClient.eMDRSet.create).not.toHaveBeenCalled();
     });
   });
 

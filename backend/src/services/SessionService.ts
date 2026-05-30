@@ -1,7 +1,7 @@
 import { prismaService } from './PrismaService';
 import { safetyProtocolService } from './SafetyProtocolService';
 import { logger } from '../utils/logger';
-import { adaptPrismaSession, adaptPrismaSessions, adaptPrismaSet } from '../utils/typeAdapters';
+import { adaptPrismaSession, adaptPrismaSessions, adaptPrismaSet, toPrismaPhase } from '../utils/typeAdapters';
 import {
   EMDRPhase, 
   DistressLevel,
@@ -288,7 +288,9 @@ export class SessionService {
       const updatedSession = await this.prisma.eMDRSession.update({
         where: { id: sessionId },
         data: {
-          phase: nextPhase,
+          // getNextPhase returns a shared (lowercase) value; the Prisma enum
+          // column expects the UPPERCASE key (PREPARATION, ASSESSMENT, ...).
+          phase: (toPrismaPhase(nextPhase) ?? nextPhase) as unknown as EMDRPhase,
           phaseData: {
             ...((session.phaseData ?? {}) as Record<string, unknown>),
             [currentPhase]: {
@@ -337,7 +339,9 @@ export class SessionService {
         throw new Error('Session not found');
       }
 
-      if (session.state !== 'IN_PROGRESS') {
+      // getSession() returns adapter-normalized state (see adaptPrismaSession),
+      // so the value here is the shared lowercase form, not Prisma's IN_PROGRESS.
+      if (session.state !== 'in_progress') {
         throw new Error('Session must be in progress to start a set');
       }
 
