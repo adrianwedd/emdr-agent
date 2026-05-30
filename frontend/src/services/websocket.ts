@@ -227,7 +227,7 @@ class WebSocketService {
   public get connectionState(): string {
     if (!this.socket) return 'disconnected';
     if (this.isConnected) return 'connected';
-    if (this.socket.connecting) return 'connecting';
+    if (this.socket.active) return 'connecting';
     return 'disconnected';
   }
 }

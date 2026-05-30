@@ -35,6 +35,18 @@ const EMDR_PHASE_MAP: Record<string, string> = {
 };
 
 /**
+ * Converts a shared (lowercase) EMDRPhase value — or an already-uppercase
+ * Prisma key — into the Prisma enum key (UPPERCASE) the database column
+ * expects. The inverse of the lowercasing done by {@link adaptPrismaSession}.
+ * Returns `undefined` for an unrecognized phase.
+ */
+export function toPrismaPhase(phase: string): string | undefined {
+  if (typeof phase !== 'string') return undefined;
+  const key = phase.toUpperCase();
+  return key in EMDR_PHASE_MAP ? key : undefined;
+}
+
+/**
  * Adapts a Prisma EMDRSession row (and optional nested relations) so that
  * all `null` values become `undefined`.
  *

@@ -68,7 +68,7 @@ export const SessionPage: React.FC = () => {
     return <div className="min-h-screen bg-therapy-bg flex items-center justify-center"><div className="text-center"><p className="text-gray-600 mb-4">Session not found</p><Button variant="primary" onClick={() => navigate('/')}>Back to Dashboard</Button></div></div>;
   }
 
-  const currentPhaseIndex = PHASE_ORDER.indexOf(activeSession.phase?.toLowerCase() || 'preparation');
+  const currentPhaseIndex = (PHASE_ORDER as readonly string[]).indexOf(activeSession.phase?.toLowerCase() || 'preparation');
   const nextPhase = currentPhaseIndex < PHASE_ORDER.length - 1 ? PHASE_ORDER[currentPhaseIndex + 1] : null;
   const isActive = activeSession.state === 'in_progress';
 

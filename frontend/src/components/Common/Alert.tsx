@@ -1,11 +1,12 @@
 import React from 'react';
-import { AlertCircle, CheckCircle, Info, AlertTriangle, type LucideIcon } from 'lucide-react';
+import { AlertCircle, CheckCircle, Info, AlertTriangle, X, type LucideIcon } from 'lucide-react';
 
 interface AlertProps {
   variant: 'info' | 'success' | 'warning' | 'error';
   title?: string;
   children: React.ReactNode;
   className?: string;
+  onDismiss?: () => void;
 }
 
 const styles: Record<string, { container: string; icon: LucideIcon }> = {
@@ -22,16 +23,26 @@ const roleMap: Record<string, 'alert' | 'status'> = {
   error: 'alert',
 };
 
-export const Alert: React.FC<AlertProps> = ({ variant, title, children, className = '' }) => {
+export const Alert: React.FC<AlertProps> = ({ variant, title, children, className = '', onDismiss }) => {
   const { container, icon: Icon } = styles[variant];
 
   return (
     <div className={`flex gap-3 rounded-lg border p-4 ${container} ${className}`} role={roleMap[variant]}>
       <Icon size={20} className="flex-shrink-0 mt-0.5" aria-hidden="true" />
-      <div>
+      <div className="flex-1">
         {title && <p className="font-medium mb-1">{title}</p>}
         <div className="text-sm">{children}</div>
       </div>
+      {onDismiss && (
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Dismiss"
+          className="flex-shrink-0 -mt-1 -mr-1 rounded p-1 hover:bg-black/5 focus:outline-none focus:ring-2 focus:ring-current"
+        >
+          <X size={16} aria-hidden="true" />
+        </button>
+      )}
     </div>
   );
 };

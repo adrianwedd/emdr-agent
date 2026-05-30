@@ -3,6 +3,7 @@ import {
   adaptPrismaSession,
   adaptPrismaSessions,
   adaptPrismaSet,
+  toPrismaPhase,
 } from '../typeAdapters';
 
 describe('nullToUndefined', () => {
@@ -333,5 +334,31 @@ describe('adaptPrismaSet', () => {
     expect(result.endTime).toEqual(new Date('2025-01-01'));
     expect(result.duration).toBe(30);
     expect(result.userFeedback).toEqual({ rating: 'good' });
+  });
+});
+
+describe('toPrismaPhase', () => {
+  it('converts a shared lowercase phase to the Prisma uppercase key', () => {
+    expect(toPrismaPhase('preparation')).toBe('PREPARATION');
+    expect(toPrismaPhase('assessment')).toBe('ASSESSMENT');
+    expect(toPrismaPhase('body_scan')).toBe('BODY_SCAN');
+    expect(toPrismaPhase('resource_installation')).toBe('RESOURCE_INSTALLATION');
+  });
+
+  it('accepts an already-uppercase Prisma key unchanged', () => {
+    expect(toPrismaPhase('ASSESSMENT')).toBe('ASSESSMENT');
+    expect(toPrismaPhase('BODY_SCAN')).toBe('BODY_SCAN');
+  });
+
+  it('returns undefined for an unrecognized phase', () => {
+    expect(toPrismaPhase('not_a_phase')).toBeUndefined();
+    expect(toPrismaPhase('')).toBeUndefined();
+  });
+
+  it('round-trips with adaptPrismaSession lowercasing', () => {
+    // adaptPrismaSession lowercases ASSESSMENT -> assessment; toPrismaPhase reverses it.
+    const adapted = adaptPrismaSession({ phase: 'ASSESSMENT' } as Record<string, unknown>);
+    expect(adapted.phase).toBe('assessment');
+    expect(toPrismaPhase(adapted.phase)).toBe('ASSESSMENT');
   });
 });
