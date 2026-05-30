@@ -24,8 +24,9 @@ export class SafetyController {
         });
       }
 
-      // TODO: Implement triggerManualCheck in SafetyProtocolService
-      const safetyCheck = { id: 'placeholder', sessionId, reason, timestamp: new Date() };
+      const safetyCheck = reason
+        ? await safetyProtocolService.triggerManualCheck(sessionId, reason)
+        : await safetyProtocolService.assessCurrentState(sessionId);
 
       return res.json({
         success: true,

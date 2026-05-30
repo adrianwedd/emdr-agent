@@ -1,7 +1,8 @@
 import { prismaService } from './PrismaService';
 import { safetyProtocolService } from './SafetyProtocolService';
 import { logger } from '../utils/logger';
-import { 
+import { adaptPrismaSession, adaptPrismaSessions, adaptPrismaSet } from '../utils/typeAdapters';
+import {
   EMDRPhase, 
   DistressLevel,
   ValidityOfCognition,
@@ -14,7 +15,14 @@ import { SessionState } from '@prisma/client';
 
 export interface CreateSessionData {
   userId: string;
-  targetMemoryId: string;
+  targetMemoryId?: string;
+  targetMemory?: {
+    description: string;
+    negativeCognition: string;
+    positiveCognition: string;
+    emotion: string;
+    bodyLocation?: string;
+  };
   initialSUD: number;
   initialVOC: number;
   preparationNotes?: string;
@@ -94,7 +102,7 @@ export class SessionService {
    */
   public async createSession(data: CreateSessionData): Promise<EMDRSession> {
     try {
-      logger.debug(`Creating session for user ${data.userId} with memory ${data.targetMemoryId}`);
+      logger.debug(`Creating session for user ${data.userId} with memory ${data.targetMemoryId || '(inline)'}`);
 
       // Validate SUD and VOC ranges
       if (data.initialSUD < 0 || data.initialSUD > 10) {
@@ -104,10 +112,28 @@ export class SessionService {
         throw new Error('Initial VOC must be between 1 and 7');
       }
 
+      // Create inline target memory if provided
+      let targetMemoryId = data.targetMemoryId;
+      if (!targetMemoryId && data.targetMemory) {
+        const created = await this.prisma.targetMemory.create({
+          data: {
+            userId: data.userId,
+            description: data.targetMemory.description,
+            negativeCognition: data.targetMemory.negativeCognition,
+            positiveCognition: data.targetMemory.positiveCognition,
+            emotion: data.targetMemory.emotion,
+            bodyLocation: data.targetMemory.bodyLocation,
+            initialSUD: data.initialSUD,
+            initialVOC: data.initialVOC,
+          },
+        });
+        targetMemoryId = created.id;
+      }
+
       // Verify target memory exists and belongs to user
       const targetMemory = await this.prisma.targetMemory.findFirst({
         where: {
-          id: data.targetMemoryId,
+          id: targetMemoryId,
           userId: data.userId,
           isActive: true
         }
@@ -135,7 +161,7 @@ export class SessionService {
       const session = await this.prisma.eMDRSession.create({
         data: {
           userId: data.userId,
-          targetMemoryId: data.targetMemoryId,
+          targetMemoryId: targetMemoryId!,
           phase: EMDRPhase.PREPARATION,
           state: SessionState.PREPARING,
           initialSUD: data.initialSUD,
@@ -173,7 +199,7 @@ export class SessionService {
       });
 
       logger.info(`Session created: ${session.id} for user ${data.userId}`);
-      return session as any; // TODO: Create proper type adapter
+      return adaptPrismaSession(session);
     } catch (error) {
       logger.error('Failed to create session:', error);
       throw prismaService.handlePrismaError(error);
@@ -194,13 +220,19 @@ export class SessionService {
         throw new Error(`Cannot start session due to safety concerns: ${safetyAssessment.intervention?.instructions?.[0] || 'Safety check failed'}`);
       }
 
+      // Get current session data before updating
+      const currentSessionData = await this.prisma.eMDRSession.findUnique({
+        where: { id: sessionId },
+        select: { sessionData: true }
+      });
+
       const session = await this.prisma.eMDRSession.update({
         where: { id: sessionId },
         data: {
           state: SessionState.IN_PROGRESS,
           startTime: new Date(),
           sessionData: {
-            ...((session as any)?.sessionData || {}),
+            ...((currentSessionData?.sessionData ?? {}) as Record<string, unknown>),
             started: new Date().toISOString()
           }
         },
@@ -221,7 +253,7 @@ export class SessionService {
       }
 
       logger.info(`Session started: ${sessionId}`);
-      return session as any; // TODO: Create proper type adapter
+      return adaptPrismaSession(session);
     } catch (error) {
       logger.error(`Failed to start session ${sessionId}:`, error);
       throw prismaService.handlePrismaError(error);
@@ -258,7 +290,7 @@ export class SessionService {
         data: {
           phase: nextPhase,
           phaseData: {
-            ...((session as any).phaseData || {}),
+            ...((session.phaseData ?? {}) as Record<string, unknown>),
             [currentPhase]: {
               completed: new Date().toISOString(),
               notes: phaseNotes,
@@ -286,7 +318,7 @@ export class SessionService {
       }
 
       logger.info(`Session ${sessionId} progressed to phase: ${nextPhase}`);
-      return updatedSession as EMDRSession;
+      return adaptPrismaSession(updatedSession);
     } catch (error) {
       logger.error(`Failed to progress session ${sessionId}:`, error);
       throw prismaService.handlePrismaError(error);
@@ -342,7 +374,7 @@ export class SessionService {
       }
 
       logger.info(`Set ${setNumber} started for session ${sessionId}`);
-      return emdrSet as EMDRSet;
+      return adaptPrismaSet(emdrSet);
     } catch (error) {
       logger.error(`Failed to start set for session ${sessionId}:`, error);
       throw prismaService.handlePrismaError(error);
@@ -434,7 +466,7 @@ export class SessionService {
       }
 
       logger.info(`Set ${session.currentSetNumber} completed for session ${sessionId} (SUD: ${endData.userFeedback.sud})`);
-      return updatedSet as EMDRSet;
+      return adaptPrismaSet(updatedSet);
     } catch (error) {
       logger.error(`Failed to end set for session ${sessionId}:`, error);
       throw prismaService.handlePrismaError(error);
@@ -448,12 +480,18 @@ export class SessionService {
     try {
       logger.debug(`Pausing session: ${sessionId}`);
 
+      // Get current session data before updating
+      const currentSessionData = await this.prisma.eMDRSession.findUnique({
+        where: { id: sessionId },
+        select: { sessionData: true }
+      });
+
       const session = await this.prisma.eMDRSession.update({
         where: { id: sessionId },
         data: {
           state: SessionState.PAUSED,
           sessionData: {
-            ...((session as any)?.sessionData || {}),
+            ...((currentSessionData?.sessionData ?? {}) as Record<string, unknown>),
             paused: new Date().toISOString(),
             pauseReason: reason
           }
@@ -469,7 +507,7 @@ export class SessionService {
       });
 
       logger.info(`Session paused: ${sessionId}${reason ? ` (${reason})` : ''}`);
-      return session as any; // TODO: Create proper type adapter
+      return adaptPrismaSession(session);
     } catch (error) {
       logger.error(`Failed to pause session ${sessionId}:`, error);
       throw prismaService.handlePrismaError(error);
@@ -500,7 +538,7 @@ export class SessionService {
         data: {
           state: SessionState.IN_PROGRESS,
           sessionData: {
-            ...((currentSession?.sessionData as any) || {}),
+            ...((currentSession?.sessionData ?? {}) as Record<string, unknown>),
             resumed: new Date().toISOString()
           }
         },
@@ -521,7 +559,7 @@ export class SessionService {
       }
 
       logger.info(`Session resumed: ${sessionId}`);
-      return session as any; // TODO: Create proper type adapter
+      return adaptPrismaSession(session);
     } catch (error) {
       logger.error(`Failed to resume session ${sessionId}:`, error);
       throw prismaService.handlePrismaError(error);
@@ -555,7 +593,7 @@ export class SessionService {
           finalSUD: session.currentSUD,
           finalVOC: session.currentVOC,
           sessionData: {
-            ...((session as any).sessionData || {}),
+            ...(((session as unknown as Record<string, unknown>).sessionData ?? {}) as Record<string, unknown>),
             completed: endTime.toISOString(),
             completionNotes: notes
           }
@@ -586,7 +624,7 @@ export class SessionService {
       this.activeSessions.delete(sessionId);
 
       logger.info(`Session completed: ${sessionId} (Duration: ${Math.round(totalDuration / 60)}min, Final SUD: ${session.currentSUD})`);
-      return completedSession as any; // TODO: Create proper type adapter
+      return adaptPrismaSession(completedSession);
     } catch (error) {
       logger.error(`Failed to complete session ${sessionId}:`, error);
       throw prismaService.handlePrismaError(error);
@@ -612,7 +650,7 @@ export class SessionService {
           state: SessionState.EMERGENCY_STOPPED,
           endTime: new Date(),
           sessionData: {
-            ...((currentSession?.sessionData as any) || {}),
+            ...((currentSession?.sessionData ?? {}) as Record<string, unknown>),
             emergencyStop: new Date().toISOString(),
             emergencyReason: reason
           }
@@ -634,7 +672,7 @@ export class SessionService {
       await safetyProtocolService.triggerManualCheck(sessionId, `Emergency stop: ${reason}`);
 
       logger.warn(`Session emergency stopped: ${sessionId}`);
-      return session as any; // TODO: Create proper type adapter
+      return adaptPrismaSession(session);
     } catch (error) {
       logger.error(`Failed to emergency stop session ${sessionId}:`, error);
       throw prismaService.handlePrismaError(error);
@@ -665,7 +703,7 @@ export class SessionService {
         }
       });
 
-      return session as EMDRSession | null;
+      return session ? adaptPrismaSession(session) : null;
     } catch (error) {
       logger.error(`Failed to get session ${sessionId}:`, error);
       throw prismaService.handlePrismaError(error);
@@ -756,12 +794,22 @@ export class SessionService {
     try {
       logger.debug(`Completing EMDR set ${setId} for session: ${sessionId}`);
 
+      // Fetch set and verify it belongs to this session
+      const currentSet = await this.prisma.eMDRSet.findUnique({ where: { id: setId } });
+      if (!currentSet || currentSet.sessionId !== sessionId) {
+        throw new Error(`Set ${setId} not found or does not belong to session ${sessionId}`);
+      }
+      const endTime = new Date();
+      const duration = currentSet.startTime
+        ? Math.max(0, Math.floor((endTime.getTime() - currentSet.startTime.getTime()) / 1000))
+        : null;
+
       // Update the set with completion data
       const completedSet = await this.prisma.eMDRSet.update({
         where: { id: setId },
         data: {
-          endTime: new Date(),
-          duration: null, // Will be calculated based on start/end time
+          endTime,
+          duration,
           userFeedback: setData.userFeedback || null,
           agentObservations: setData.agentObservations || null
         }
@@ -783,11 +831,11 @@ export class SessionService {
       const metrics = this.activeSessions.get(sessionId);
       if (metrics) {
         metrics.lastActivity = new Date();
-        metrics.sets += 1;
+        metrics.currentSet += 1;
       }
 
       logger.info(`EMDR set completed: ${setId} for session: ${sessionId}`);
-      return completedSet as any; // TODO: Create proper type adapter
+      return adaptPrismaSet(completedSet);
     } catch (error) {
       logger.error(`Failed to complete set ${setId} for session ${sessionId}:`, error);
       throw prismaService.handlePrismaError(error);
@@ -801,17 +849,22 @@ export class SessionService {
     try {
       logger.debug(`Updating session ${sessionId} to phase: ${phase}`);
 
-      // Validate phase
-      const validPhases = ['PREPARATION', 'ASSESSMENT', 'DESENSITIZATION', 'INSTALLATION', 'BODY_SCAN', 'CLOSURE', 'REEVALUATION'];
-      if (!validPhases.includes(phase)) {
+      // Validate phase (accept both Prisma uppercase and shared lowercase values)
+      const normalizedPhase = phase.toLowerCase();
+      const phaseEntry = Object.entries(EMDRPhase).find(
+        ([, value]) => value === normalizedPhase
+      );
+      if (!phaseEntry) {
         throw new Error(`Invalid phase: ${phase}`);
       }
+      // Prisma DB enum expects UPPERCASE keys (PREPARATION, ASSESSMENT, etc.)
+      const prismaPhase = phaseEntry[0];
 
       // Update session phase
       const updatedSession = await this.prisma.eMDRSession.update({
         where: { id: sessionId },
         data: {
-          phase: phase as any, // Cast to EMDRPhase enum
+          phase: prismaPhase as unknown as EMDRPhase, // Prisma enum key (UPPERCASE)
           phaseData: phaseData || null,
           updatedAt: new Date()
         },
@@ -829,11 +882,11 @@ export class SessionService {
       const metrics = this.activeSessions.get(sessionId);
       if (metrics) {
         metrics.lastActivity = new Date();
-        metrics.phase = phase;
+        metrics.phase = normalizedPhase as unknown as EMDRPhase;
       }
 
       logger.info(`Session phase updated: ${sessionId} -> ${phase}`);
-      return updatedSession as any; // TODO: Create proper type adapter
+      return adaptPrismaSession(updatedSession);
     } catch (error) {
       logger.error(`Failed to update phase for session ${sessionId}:`, error);
       throw prismaService.handlePrismaError(error);
@@ -861,7 +914,7 @@ export class SessionService {
       logger.debug(`Getting sessions for user ${userId} (page: ${page}, limit: ${limit})`);
 
       // Build where clause
-      const where: any = { userId };
+      const where: Record<string, unknown> = { userId };
       if (filters?.state) {
         where.state = filters.state;
       }
@@ -891,7 +944,7 @@ export class SessionService {
 
       logger.debug(`Retrieved ${sessions.length} sessions for user ${userId}`);
       return {
-        sessions: sessions as any[], // TODO: Create proper type adapter
+        sessions: adaptPrismaSessions(sessions),
         pagination: {
           page,
           limit,

@@ -1,618 +1,126 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code (claude.ai/code) when working in this repository.
 
 ## Project Overview
 
-This is an **Agentic EMDR Therapy Application** - a multi-agent AI system designed for research and educational purposes to guide users through EMDR (Eye Movement Desensitization and Reprocessing) therapy sessions. **Critical**: This is NOT a medical device and is NOT a replacement for professional therapy.
+An **Agentic EMDR Therapy Application** — an AI system for **research and educational purposes** that guides users through EMDR (Eye Movement Desensitization and Reprocessing) sessions.
+
+> **Critical:** This is NOT a medical device and NOT a replacement for professional therapy. User safety overrides every other concern. Never bypass or disable safety protocols. See `docs/SAFETY_GUIDELINES.md` before any safety-related change.
 
 ## Architecture
 
-### Monorepo Structure
-- `frontend/` - React TypeScript application with Vite, Tailwind CSS, and Zustand
-- `backend/` - Node.js TypeScript API server with Express, Prisma, Socket.io
-- `shared/` - Shared TypeScript types and utilities
-- `config/` - Environment templates and configuration files
-- `docs/` - Project documentation including safety guidelines
+Monorepo with four workspaces:
 
-### Multi-Agent System
-The core architecture centers around specialized AI agents:
-- **EMDR Therapist Agent** (`backend/src/agents/therapy/EMDRTherapistAgent.ts`) - Primary therapeutic guidance
-- **Safety Monitor Agent** - Continuous distress/safety monitoring
-- **Session Orchestrator Agent** - Manages session flow and bilateral stimulation
-- **Progress Analyst Agent** - Tracks user progress over time
-- **Crisis Intervention Agent** - Handles emergency situations
+- `frontend/` — React + TypeScript (Vite, Tailwind, Zustand)
+- `backend/` — Node.js + TypeScript API (Express, Prisma, Socket.io)
+- `shared/` — shared types (`shared/types/EMDR.ts`, `shared/types/Agent.ts`)
+- `config/` — environment templates
 
-### Database Schema (PostgreSQL + Prisma)
-Key models in `backend/prisma/schema.prisma`:
-- `User` - User accounts and profiles
-- `EMDRSession` - Individual therapy sessions with phases, SUD/VOC tracking
-- `TargetMemory` - Memories being processed through EMDR
-- `AgentMessage` - All agent-user interactions
-- `SafetyCheck` - Safety monitoring events
-- `ProgressReport` - Progress tracking over time
+Other top-level docs: `ARCHITECTURE.md`, `DEVELOPMENT_PLAN.md`, `PROJECT_STATUS.md`. Sprint plans live in `docs/plans/`.
 
-## Development Commands
+### Agents
 
-### Installation & Setup
+The design envisions multiple specialized agents, but only one is implemented today:
+
+- **`EMDRTherapistAgent`** (`backend/src/agents/therapy/EMDRTherapistAgent.ts`) — primary therapeutic guidance.
+- Safety monitoring is **not** a separate agent — it lives in `SafetyProtocolService` (see below).
+- `backend/src/agents/core/` and `agents/specialized/` are empty placeholders. Treat the "Safety Monitor / Orchestrator / Progress / Crisis" agents as planned, not built.
+
+### Backend layout (`backend/src/`)
+
+- `services/` — `AuthService`, `UserService`, `SessionService`, `SafetyProtocolService`, `LLMService` (OpenAI/Anthropic), `PrismaService`
+- `controllers/` — `AuthController`, `UserController`, `SessionController`, `SafetyController`
+- `routes/` — `auth.ts`, `users.ts`, `sessions.ts`, `safety.ts` (no agent routes yet)
+- `middleware/` — JWT auth, Zod validation, multi-tier rate limiting, input sanitization
+- `utils/typeAdapters.ts` — Prisma↔shared type conversions (see Gotchas)
+
+### Frontend layout (`frontend/src/`)
+
+- `components/auth/` ✅, `components/Common/` ✅, `components/Safety/` ✅ (10 components), `components/SessionManagement/` ✅ (9 components)
+- `components/AgentInterface/`, `components/BilateralStimulation/`, `components/SafetyFeatures/` — **empty**, not yet built (bilateral stim is the next P1 feature, issue #20)
+- `pages/` — Dashboard, NewSession, Session, SessionSummary
+- `stores/` — `authStore`, `sessionStore`, `safetyStore` (Zustand)
+- `services/` — Axios API client (auto token refresh) + WebSocket service
+
+### Database (PostgreSQL + Prisma)
+
+Models in `backend/prisma/schema.prisma`: `User`, `SafetyProfile`, `TargetMemory`, `EMDRSession`, `EMDRSet`, `AgentMessage`, `SafetyCheck`, `ProgressReport`.
+
+## Commands
+
+All commands run from the repo root unless noted.
+
 ```bash
-npm run install:all          # Install all dependencies (root, frontend, backend, shared)
-cp config/development.env .env   # Copy environment template
-npm run db:migrate           # Run database migrations
+# Setup
+npm run install:all                # install root + all workspaces
+cp config/development.env .env     # then fill in secrets (see Environment)
+npm run db:migrate                 # apply Prisma migrations
+npm run db:seed                    # seed initial data
+
+# Develop
+npm run dev                        # frontend (3000) + backend (5000) concurrently
+npm run dev:frontend
+npm run dev:backend
+
+# Quality (run before committing)
+npm run type-check                 # tsc --noEmit, both packages
+npm run lint                       # frontend lint is --max-warnings 0
+npm run test                       # frontend (Vitest) + backend (Jest)
+
+# Database (these proxy into backend/)
+npm run db:generate                # regenerate Prisma client after schema edits
+npm run db:reset                   # destructive — drops and re-migrates
+cd backend && npm run db:studio    # Prisma Studio
+
+# Build
+npm run build                      # shared -> frontend -> backend
 ```
 
-### Development
-```bash
-npm run dev                  # Start both frontend (3000) and backend (5000) servers
-npm run dev:frontend         # Start only frontend development server
-npm run dev:backend          # Start only backend development server
-```
+Single-package shortcuts: `cd backend && npm run test:watch`, `cd frontend && npm run test:ui`, `npm run lint:fix` (in either package).
 
-### Testing & Quality
-```bash
-npm run test                 # Run all tests (frontend + backend)
-npm run test:frontend        # Run frontend tests (Vitest)
-npm run test:backend         # Run backend tests (Jest)
-npm run lint                 # Run ESLint on all packages
-npm run type-check           # Run TypeScript type checking
-```
+## Environment
 
-### Database Operations
-```bash
-npm run db:migrate           # Apply database migrations
-npm run db:generate          # Generate Prisma client
-npm run db:seed              # Seed database with initial data
-npm run db:reset             # Reset database (careful!)
-npm run db:studio            # Open Prisma Studio
-```
+Required in `.env` (template: `config/development.env`):
 
-### Production Build
-```bash
-npm run build               # Build all packages for production
-npm run build:frontend      # Build frontend only
-npm run build:backend       # Build backend only
-```
-
-## Implementation Status & Insights
-
-### Backend Progress (80% Complete) ✅
-The backend has made significant progress with core infrastructure in place:
-
-#### Services Layer (85% Complete) ✅
-- **PrismaService**: Database management with health checks and error handling
-- **LLMService**: Multi-provider AI integration (OpenAI/Anthropic) with safety validation
-- **SafetyProtocolService**: Real-time safety monitoring with automatic interventions
-- **AuthService**: JWT authentication with secure password handling
-- **UserService**: User profile and safety profile management  
-- **SessionService**: Complete EMDR session lifecycle management
-
-#### API Layer (60% Complete) ✅
-- **AuthController**: Complete authentication endpoint implementation
-- **Middleware**: JWT auth, request validation, rate limiting, input sanitization
-- **Routes**: Structured API routing with proper security middleware
-- **Authentication endpoints**: Registration, login, token refresh, password management
-
-#### Security Implementation (95% Complete) ✅
-- **Multi-tier rate limiting**: Different limits for auth, general API, emergency endpoints
-- **Safety-first design**: Automatic SUD monitoring, crisis intervention, grounding techniques
-- **Input validation**: Comprehensive Zod schemas for all request types
-- **Session security**: JWT tokens, ownership verification, adaptive rate limiting
-
-### Critical Implementation Insights
-
-#### Type System Challenges ⚠️
-**Issue**: Prisma-generated types vs shared TypeScript types have mismatches
-- Prisma generates `string | null` but our types expect `string | undefined`
-- Enum handling between Prisma and shared types needs alignment
-- Rate limiting library types need compatibility updates
-
-**Resolution Strategy**: 
-1. Create type adapters between Prisma and application types
-2. Use utility types to transform null to undefined
-3. Consider Prisma-first type generation for shared types
-
-#### Database Integration Patterns ✅
-**Successful Pattern**: Singleton services with dependency injection
-```typescript
-// Works well - clean service separation
-const user = await userService.getUserProfile(userId);
-const safetyCheck = await safetyProtocolService.assessCurrentState(sessionId);
-```
-
-#### Safety Architecture Success ✅
-**Key Achievement**: Comprehensive safety monitoring system
-- Automatic triggers at SUD ≥ 8 or rapid distress increase ≥ 3 points
-- Crisis intervention with professional resources (988, Crisis Text Line)
-- Grounding techniques library with proven techniques
-- Real-time safety assessments with intervention recommendations
-
-#### API Security Model ✅
-**Implemented Pattern**: Layered security middleware
-```typescript
-// Multi-layer protection working well
-router.post('/sessions', 
-  sessionCreationRateLimit,    // Prevent abuse
-  authenticate,                // JWT verification
-  requireActiveAccount,        // Account status check
-  sanitize,                   // Input cleaning
-  validate(schemas.session),   // Type validation
-  SessionController.create     // Business logic
-);
-```
-
-## Key Technical Details
-
-### Agent System (`shared/types/Agent.ts`)
-- All agents implement `BaseAgent` interface
-- Agent communication through `AgentMessage` system
-- Real-time coordination between agents using `AgentCoordination`
-- Comprehensive agent state management and memory systems
-
-### EMDR Protocol Engine
-- 8-phase EMDR protocol implementation (Preparation → Reevaluation)
-- Real-time SUD (Subjective Units of Distress, 0-10) and VOC (Validity of Cognition, 1-7) tracking
-- Multi-modal bilateral stimulation (visual, auditory, tactile)
-- Adaptive protocol timing based on user responses
-
-### Safety System
-**Critical Safety Features**:
-- Automatic safety triggers at SUD ≥ 8 or rapid distress increase
-- Real-time dissociation monitoring
-- Crisis intervention protocols with emergency contacts
-- Professional referral system integration
-- All safety logic in `backend/src/services/SafetyProtocolService.ts`
-
-### WebSocket Integration
-- Real-time communication via Socket.io
-- Session-based connection management (`session_{sessionId}` rooms)
-- Agent message broadcasting and user response handling
-
-## Development Guidelines
-
-### Safety First
-- **Never bypass or disable safety protocols**
-- Always prioritize user safety over functionality
-- Review `docs/SAFETY_GUIDELINES.md` before making safety-related changes
-- Test safety triggers thoroughly with unit tests
-
-### Agent Development
-- Extend `BaseAgent` interface for new agents
-- Implement comprehensive decision-making logic in `makeDecision()`
-- Use structured prompts for LLM interactions
-- Store agent state and memory for context continuity
-
-### Database Changes
-- Always create migrations for schema changes: `npx prisma migrate dev --name descriptive_name`
-- Update TypeScript types after schema changes: `npm run db:generate`
-- Test migrations on development data before applying to production
-
-### Testing Strategy
-- Unit tests for agent logic and business rules
-- Integration tests for API endpoints and database operations
-- End-to-end tests for complete user workflows
-- Performance tests for real-time bilateral stimulation
-- **Mandatory**: Safety protocol testing for all agent interactions
-
-### Code Quality Standards
-- TypeScript strict mode enabled
-- ESLint/Prettier configured across all packages
-- Comprehensive error handling with Winston logging
-- Type safety for all agent communications and database operations
-
-## Environment Setup
-
-Required environment variables in `.env`:
 ```
 DATABASE_URL=postgresql://...
-OPENAI_API_KEY=your-key-here
-ANTHROPIC_API_KEY=your-key-here
-JWT_SECRET=your-secret
+ANTHROPIC_API_KEY=...
+OPENAI_API_KEY=...
+JWT_SECRET=...
 REDIS_URL=redis://localhost:6379
 ```
 
-## Important Implementation Notes
+Docker for local Postgres + Redis: `npm run docker:up` (compose file at repo root).
 
-### LLM Integration
-- Agents use configurable LLM providers (OpenAI, Anthropic)
-- System prompts emphasize safety and therapeutic boundaries
-- Temperature and token limits configured per agent type
-- Response validation for safety and appropriateness
+## Safety System (read before touching)
 
-### Real-time Features
-- Session state synchronized via Redis caching
-- WebSocket events for bilateral stimulation timing
-- Live SUD/VOC tracking during processing sets
-- Emergency stop capabilities with immediate response
+All safety logic is in `backend/src/services/SafetyProtocolService.ts`:
 
-### Data Privacy
-- HIPAA compliance considerations throughout
-- End-to-end encryption for sensitive therapeutic data
-- User-controlled data retention and deletion
-- Audit logging for all therapeutic interactions
+- Automatic triggers at **SUD ≥ 8** or a rapid distress increase (**≥ 3 points**).
+- Crisis intervention surfaces professional resources (988, Crisis Text Line).
+- Grounding-techniques library + effectiveness reporting.
+- Emergency-stop capability is wired through the WebSocket layer.
+- Frontend safety UI: `frontend/src/components/Safety/` + `safetyStore`.
 
-### Latest Development Progress (2025-08-01 Session 2)
+EMDR protocol context: 8 phases (Preparation → Reevaluation), SUD (0–10) and VOC (1–7) tracking per set.
 
-#### ✅ **COMPLETED: Major Backend Infrastructure Milestone**
-**Session Duration**: 90+ minutes
-**Status**: Backend is now 90% complete and functionally ready
+## Conventions
 
-**Critical TypeScript Fixes Completed**:
-1. ✅ **Enum Conflict Resolution** - Fixed `AgentState` interface vs enum naming conflict (`shared/types/Agent.ts:286-327`)
-2. ✅ **Prisma Type Compatibility** - Resolved null vs undefined mismatches in auth middleware (`backend/src/middleware/auth.ts:45-90`)
-3. ✅ **Rate Limiting Types** - Fixed keyGenerator return type issues (`backend/src/middleware/rateLimit.ts:25-147`)
-4. ✅ **Validation Middleware** - Fixed Zod issue property access and forward references (`backend/src/middleware/validation.ts:22-192`)
-5. ✅ **SessionService Enums** - Resolved Prisma enum vs shared enum conflicts (`backend/src/services/SessionService.ts:13`)
+- TypeScript strict mode across all packages.
+- Request flow / middleware order: `rateLimit → authenticate → sanitize → validate(zodSchema) → controller`.
+- Services are singletons; controllers call services, never Prisma directly.
+- Winston for logging.
 
-**API Controllers Infrastructure Completed**:
-- ✅ **UserController** (`backend/src/controllers/UserController.ts`) - Profile management, stats, safety profiles, account deletion
-- ✅ **SessionController** (`backend/src/controllers/SessionController.ts`) - Full EMDR session lifecycle, set management, phase updates  
-- ✅ **SafetyController** (`backend/src/controllers/SafetyController.ts`) - Safety checks, emergency protocols, grounding techniques, crisis resources
-- ✅ **Route Integration** (`backend/src/routes/`) - All controllers connected to API endpoints with proper middleware
-- ✅ **Middleware Stack** - Authentication, rate limiting, validation, sanitization all working together
+## Gotchas
 
-**Key Implementation Insights Discovered**:
-- **Type System Strategy**: Created adapter pattern for Prisma↔shared types (`as any` placeholders for interface mismatches)
-- **Service Method Placeholders**: Controllers use TODO placeholders for missing service methods (systematic technical debt)
-- **Validation Schema Architecture**: Fixed circular reference issues by reorganizing schema definitions
-- **Middleware Layering**: Successfully implemented multi-tier security (auth→rate limit→validate→sanitize→controller)
+- **Package manager drift:** scripts use **npm**, but a stray `pnpm-lock.yaml` exists at the root (and in `backend/`). Use npm; the pnpm lockfiles are slated for removal. Don't add to them.
+- **Prisma null vs shared undefined:** Prisma emits `string | null`; shared types expect `string | undefined`. Convert via `backend/src/utils/typeAdapters.ts` — don't sprinkle `as any`.
+- **Test coverage is thin:** only backend has tests (4 files, all in `__tests__/`). There are **no frontend tests yet**. Safety-protocol logic must be unit-tested when changed.
+- **Rate limiting** is disabled in development; verify limits against production config before relying on them.
 
-#### 🔄 **IMMEDIATE NEXT PRIORITIES (Session 3)**
+## Working Norms
 
-**1. Complete Service Method Implementations** (High Priority - 2-3 hours):
-- `SafetyProtocolService`: Add missing methods referenced by SafetyController
-  - `updateSafetyMeasurements()`, `getSafetyHistory()`, `triggerEmergencyProtocol()`
-  - `getGroundingTechniques()`, `reportGroundingEffectiveness()`, `getCrisisResources()`
-- `SessionService`: Add missing methods referenced by SessionController
-  - `completeSet()`, `updateSessionPhase()`, fix `getUserSessions()` signature
-- `UserService`: Fix `deleteAccount()` method signature
-
-**2. Validation Schema Completion** (Medium Priority - 1 hour):
-- Add missing validation schemas referenced in routes:
-  - `sessionIdParam`, `safetyCheck`, `safetyMeasurements`, `emergencyTrigger`
-  - `groundingQuery`, `groundingEffectiveness`, `crisisResourcesQuery`
-  - `createSession`, `completeSession`, `startSet`, `updatePhase`
-
-**3. Integration Testing Setup** (High Priority - 1-2 hours):
-- Set up database with Prisma migrations
-- Test authentication endpoints with real JWT flow
-- Verify API endpoints work end-to-end
-- Test safety protocol integration
-
-#### 📋 **TECHNICAL DEBT TRACKING**
-- **TODO Placeholders**: 12 service method implementations marked with TODO comments
-- **Type System**: Interface mismatches using `as any` need proper type adapters
-- **JWT/LLM Services**: Remaining TypeScript compilation issues (low priority)
-- **Validation Schemas**: 8 missing endpoint validation schemas
-
-### ✅ **COMPLETED: Service Implementation & API Infrastructure (Session 3)**
-**Session Duration**: 120+ minutes  
-**Achievement**: Backend service layer 100% functionally complete
-
-#### **🚀 Major Service Method Implementations**:
-
-**SafetyProtocolService** - **6 Critical Methods Added**:
-```typescript
-// backend/src/services/SafetyProtocolService.ts:543-745
-updateSafetyMeasurements(sessionId, measurements) // Database safety check creation
-getSafetyHistory(sessionId) // Complete safety audit trail retrieval  
-triggerEmergencyProtocol(sessionId, details) // Full emergency stop with crisis resources
-getGroundingTechniques(options) // Personalized technique recommendations
-reportGroundingEffectiveness(report) // User feedback collection system
-getCrisisResources(options) // Location-aware crisis resource delivery
-```
-
-**SessionService** - **3 Core Methods Enhanced**:
-```typescript
-// backend/src/services/SessionService.ts:773-932
-completeSet(sessionId, setId, setData) // EMDR set completion with SUD/VOC tracking
-updateSessionPhase(sessionId, phase, phaseData) // 8-phase EMDR protocol management
-getUserSessions(userId, page, limit, filters) // Proper pagination & filtering
-```
-
-**UserService** - **Enhanced Security**:
-```typescript
-// backend/src/services/UserService.ts:386-404
-deleteAccount(userId, password) // Password-verified account deletion with cascade cleanup
-```
-
-#### **🏗️ Complete API Controller Infrastructure**:
-
-**UserController** (`backend/src/controllers/UserController.ts`):
-- Profile management with safety integration
-- User statistics and progress tracking  
-- Safety profile CRUD operations
-- Secure account deletion with password verification
-
-**SessionController** (`backend/src/controllers/SessionController.ts`):
-- Complete EMDR session lifecycle management
-- Real-time set creation and completion
-- Phase progression through 8 EMDR phases
-- Emergency stop capabilities with safety integration
-
-**SafetyController** (`backend/src/controllers/SafetyController.ts`):
-- Manual and automatic safety assessments
-- Emergency protocol activation
-- Grounding technique delivery and effectiveness tracking
-- Crisis resource management with location awareness
-
-#### **🔧 Critical Technical Achievements**:
-
-**Type System Resolution** - **5 Major Fixes**:
-1. **AgentState Conflict**: Resolved interface vs enum naming collision (`shared/types/Agent.ts:286→AgentStateData`)
-2. **Prisma Compatibility**: Fixed null↔undefined type adapter pattern (`backend/src/middleware/auth.ts:47-90`)
-3. **Rate Limiting Types**: Resolved keyGenerator return type issues (`backend/src/middleware/rateLimit.ts:25-147`)
-4. **Validation Integration**: Fixed Zod circular references and duplicate properties (`backend/src/middleware/validation.ts`)
-5. **Service Signatures**: Aligned controller calls with actual service method signatures
-
-**Validation Schema Architecture** - **20+ Schemas Added**:
-```typescript
-// Complete endpoint validation coverage
-safetyCheck, sessionIdParam, safetyMeasurements, emergencyTrigger
-groundingQuery, groundingEffectiveness, crisisResourcesQuery
-sessionQuery, createSession, completeSession, startSet, updatePhase
-setParams, safetyProfile, deleteAccount, uuidParam
-```
-
-**Route Integration** - **Complete API Surface**:
-- `/api/users/*` - Profile, stats, safety management
-- `/api/sessions/*` - EMDR session lifecycle  
-- `/api/safety/*` - Safety monitoring and emergency protocols
-- Multi-layer middleware: auth → rate limit → validate → sanitize → controller
-
-#### **📊 Backend Completion Status: 100% Functional Core**
-
-**✅ Complete & Tested**:
-- **Services Layer**: All methods implemented with database integration
-- **API Controllers**: Full CRUD operations with proper error handling
-- **Middleware Stack**: Security, validation, rate limiting, sanitization
-- **Route Configuration**: Complete API surface with proper documentation
-- **Type Safety**: Major TypeScript compilation issues resolved
-
-**🔧 Minor Remaining (5 minutes)**:
-- 2 validation schema duplicate properties  
-- 3 validation schema type structure fixes
-
-#### **🎯 **SESSION 4 PRIORITIES**
-
-**Phase 2A (Session 4)** - **Integration & Testing**:
-1. ✅ **Database Setup** - Run Prisma migrations and seed data
-2. ✅ **API Integration Testing** - Test all endpoints with Postman/curl
-3. ✅ **Authentication Flow** - Verify JWT token lifecycle  
-4. ✅ **Safety Protocol Testing** - Validate emergency stop functionality
-
-**Phase 2B (Sessions 5-6)** - **Frontend Foundation**:
-1. **React Authentication** - Login/register components with Zustand state
-2. **Session Management UI** - Basic session creation and monitoring
-3. **Safety Monitoring UI** - Emergency stop and grounding techniques
-4. **WebSocket Integration** - Real-time session state updates
-
-**Phase 3 (Sessions 7-8)** - **Core EMDR Features**:
-1. **Bilateral Stimulation Engine** - Visual/audio/tactile stimulation components
-2. **8-Phase EMDR UI** - Complete protocol implementation
-3. **Progress Tracking** - SUD/VOC monitoring and visualization
-
-### Development Workflow Insights
-
-#### Successful Patterns ✅
-- **Service-first development**: Building services before controllers worked well
-- **Safety-first design**: Implementing safety features early prevented issues
-- **Comprehensive middleware**: Layered security provides robust protection
-- **Type-safe validation**: Zod schemas catch issues early in development
-
-#### Lessons Learned ⚠️
-- **Type system complexity**: Prisma + shared types need careful coordination
-- **Mental health requirements**: Safety features require extensive validation
-- **Rate limiting importance**: Multiple tiers needed for different use cases
-- **Error handling criticality**: Clear error messages essential for user safety
-
-### Session 4 Major Milestone: Full-Stack Integration Complete ✅
-
-#### API Integration Testing Success (100% Complete)
-**Date**: 2025-08-01 Session 4  
-**Duration**: ~90 minutes  
-**Status**: ✅ **FULL-STACK AUTHENTICATION WORKING END-TO-END**
-
-##### Key Achievements
-1. **Server Startup Resolution**: Fixed rate limiting IPv6 issues and LLM service initialization
-2. **Database Integration**: PostgreSQL + Redis running locally with successful migrations
-3. **API Testing Suite**: Comprehensive test client validating all authentication endpoints
-4. **Frontend Authentication**: Complete React authentication system with Zustand store
-5. **Real-time Architecture**: WebSocket service and React hooks for agent communication
-
-##### Technical Validation Results
-- ✅ Health endpoint: Database connectivity confirmed
-- ✅ User registration: Creating users with safety profiles automatically
-- ✅ Authentication: JWT tokens with automatic refresh logic working
-- ✅ Protected routes: Profile access with proper authorization
-- ✅ Safety endpoints: Monitoring and grounding techniques accessible
-- ✅ WebSocket foundation: Real-time communication infrastructure ready
-
-##### Frontend Architecture Completed
-- **Authentication Components**: LoginForm, RegisterForm, AuthPage with comprehensive validation
-- **State Management**: Zustand store with persistent auth state and token refresh
-- **API Integration**: Axios client with automatic token handling and error management
-- **Routing System**: Protected routes with authentication guards and fallbacks
-- **Real-time Features**: WebSocket service with event handling and auto-reconnection
-- **UI Foundation**: Tailwind CSS components with safety-first design principles
-
-##### Production Readiness Assessment
-
-#### Backend (98% Complete) ✅
-- [x] Database schema and migrations
-- [x] Core services implementation  
-- [x] Authentication and authorization
-- [x] API middleware and validation
-- [x] Safety monitoring systems
-- [x] TypeScript compilation fixes
-- [x] Integration tests (API client validation)
-- [x] Database seeding and local development setup
-- [ ] Production monitoring and alerting
-
-#### Frontend (40% Complete) ✅
-- [x] Project structure and build tools
-- [x] Authentication components (complete system)
-- [x] API service layer with error handling
-- [x] State management (Zustand auth store)
-- [x] Protected routing system
-- [x] WebSocket integration foundation
-- [x] Real-time connection monitoring
-- [ ] Session management interface
-- [ ] Safety monitoring UI components
-- [ ] Agent interaction components  
-- [ ] Bilateral stimulation engine
-
-#### Integration Layer (85% Complete) ✅
-- [x] End-to-end authentication flow
-- [x] API client with token refresh logic
-- [x] WebSocket real-time communication
-- [x] Error handling and user feedback
-- [x] Type-safe API contracts
-- [ ] Agent message routing
-- [ ] Session state synchronization
-
-##### Critical Technical Insights
-
-**Successful Patterns** ✅
-- **Development-first testing**: API testing client enabled rapid validation
-- **Type-safe architecture**: Shared types between frontend/backend prevent errors
-- **Authentication-first approach**: Solid auth foundation enables all other features
-- **WebSocket abstraction**: Service layer makes real-time features easy to use
-- **Safety-integrated design**: User registration automatically creates safety profiles
-
-**Architecture Decisions That Worked** ✅
-- **Zustand over Redux**: Simpler state management for authentication
-- **Axios interceptors**: Automatic token refresh without component complexity  
-- **Protected route pattern**: Clean separation of authenticated vs public content
-- **WebSocket hook pattern**: Encapsulates complex real-time logic in reusable hook
-- **API service abstraction**: Consistent error handling across all requests
-
-##### Development Workflow Insights
-
-**What Accelerated Development** 🚀
-- **API-first testing**: Validating backend before UI development caught issues early
-- **Component-driven development**: Building authentication components in isolation
-- **Type safety emphasis**: TypeScript caught integration issues before runtime
-- **Real-time architecture upfront**: WebSocket foundation ready for agent features
-
-**Next Development Priorities** 🎯
-
-**Phase 5 (Next Session): Agent Integration & Session Management**
-1. **EMDR Session Components**: Create session interface with phase progression
-2. **Agent Communication UI**: Real-time agent message display and interaction
-3. **Safety Monitoring Interface**: Live SUD/VOC tracking with alert system
-4. **Bilateral Stimulation Engine**: Visual/audio/tactile stimulation components
-
-**Phase 6: Advanced Features**
-1. **Progress Analytics**: Session history and outcome tracking
-2. **Crisis Intervention UI**: Emergency protocols and professional referrals
-3. **Multi-modal Agents**: Specialized agent interfaces for different therapy phases
-4. **Advanced Safety**: Real-time biometric integration (if enabled)
-
-### Current System Status
-
-**Backend API**: 🟢 **Production Ready**
-- Full authentication system with JWT refresh
-- Complete safety monitoring with automatic triggers
-- Database integration with proper migrations
-- Real-time WebSocket support for agents
-- Comprehensive error handling and logging
-
-**Frontend Foundation**: 🟡 **Integration Ready**  
-- Complete authentication user experience
-- Real-time communication infrastructure  
-- Type-safe API integration
-- Protected routing and state management
-- Safety-first UI components and validation
-
-**Development Experience**: 🟢 **Excellent**
-- Local database setup automated
-- API testing suite for rapid validation
-- Type safety across full stack
-- Hot reload and development tools working
-- Clear error messages and debugging info
-
-When working on this codebase, always consider the therapeutic context and prioritize user safety above all other concerns. This system handles sensitive mental health data and must maintain the highest standards of safety and reliability.
-
-### Session 4 Final Insights & Patterns
-
-#### 🏆 Architecture Decisions That Proved Successful
-
-1. **API-First Development Approach**
-   - Building comprehensive test client (`backend/test-api.js`) before UI development
-   - Enabled rapid endpoint validation and caught integration issues early
-   - **Result**: 100% authentication flow working before any frontend code
-
-2. **Authentication-Foundation Strategy** 
-   - Implementing complete auth system before other features
-   - User safety profiles automatically created on registration
-   - **Result**: All subsequent features build on proven, secure foundation
-
-3. **Type-Safe Integration Layer**
-   - Shared TypeScript interfaces between frontend and backend
-   - Consistent API response structure across all endpoints
-   - **Result**: Zero integration mismatches, compile-time error prevention
-
-4. **WebSocket Infrastructure First**
-   - Building real-time communication before agent features
-   - Event-driven architecture with proper error handling
-   - **Result**: Ready for multi-agent communication without refactoring
-
-#### 🔬 Development Workflow Insights
-
-**Most Effective Patterns**:
-- **Service-layer implementation** → **API testing** → **Frontend integration**
-- **TypeScript interfaces first** → **Implementation** → **Validation**
-- **Authentication complete** → **Protected features** → **Real-time layer**
-
-**Time Investment ROI**:
-- Database setup (15 min) → Enabled all subsequent development
-- API testing client (25 min) → Saved hours of debugging
-- Authentication foundation (35 min) → All future features are secured
-- WebSocket infrastructure (15 min) → Real-time features ready
-
-#### 🛡️ Safety-First Design Validation
-
-**Automatically Enforced**:
-- User registration creates safety profiles immediately
-- All API endpoints require authentication
-- Rate limiting prevents abuse (disabled in development only)
-- Input validation on all user data
-- Emergency stop capabilities built into WebSocket layer
-
-**User Experience**:
-- Clear error messages guide users safely
-- Terms acceptance required for research use
-- Safety warnings displayed prominently
-- Graceful degradation when services unavailable
-
-#### 📊 Production Readiness Metrics
-
-| Component | Completion | Production Ready | Notes |
-|-----------|------------|------------------|-------|
-| Backend API | 98% | ✅ Yes | All endpoints tested, safety integrated |
-| Database Layer | 100% | ✅ Yes | Migrations, seeding, local setup complete |
-| Authentication | 100% | ✅ Yes | JWT refresh, protected routes, error handling |
-| WebSocket Layer | 95% | ✅ Yes | Connection management, event routing ready |
-| Frontend Auth | 100% | ✅ Yes | Complete user experience, type-safe |
-| Frontend Base | 40% | 🟡 Foundation | Ready for session/agent components |
-
-#### 🚀 Next Session Success Factors
-
-**Ready-to-Use Foundation**:
-- Authentication system handles all user management
-- API client with automatic token refresh
-- WebSocket service with React hooks
-- Protected routing and state management
-- Type-safe contracts prevent integration errors
-
-**Recommended Development Order**:
-1. **EMDR Session Interface** (builds on auth foundation)
-2. **Safety Monitoring UI** (critical for user safety)
-3. **Agent Communication** (uses WebSocket infrastructure)
-4. **Bilateral Stimulation** (final core EMDR component)
-
-**Technical Debt**: Minimal - All patterns proven and documented
-
-**Last Updated**: 2025-08-01 Session 4 (Full-Stack Authentication & Real-time Integration Complete)
-**Next Claude Code Session**: EMDR session management and agent interaction components  
-**GitHub Issues**: Updated with Session 4 completions and Phase 5 priorities
+- Prioritize user safety over functionality in every decision.
+- Create a migration for any schema change (`cd backend && npx prisma migrate dev --name <desc>`), then `npm run db:generate`.
+- Verify with `npm run type-check` and `npm run test` before claiming work complete.

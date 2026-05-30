@@ -1,0 +1,30 @@
+# Dependabot configuration.
+# Strategy: group routine patch/minor bumps into a single PR per ecosystem so the
+# pipeline doesn't jam on many small PRs; let major bumps come as separate, isolated
+# PRs so breaking changes can be reviewed and verified one at a time.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    # Single root package-lock.json covers the npm workspaces (frontend, backend, shared),
+    # but list the workspace package.json directories so manifest-only bumps are caught too.
+    directories:
+      - "/"
+      - "/frontend"
+      - "/backend"
+      - "/shared"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      # Routine, low-risk updates batched together.
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    # Majors are intentionally NOT grouped — Dependabot opens one PR each so a
+    # breaking bump (e.g. uuid, vite, @typescript-eslint) is isolated and reversible.
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

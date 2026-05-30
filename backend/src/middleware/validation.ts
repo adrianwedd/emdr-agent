@@ -277,22 +277,35 @@ export const validationSchemas = {
   // Session schemas
   createSession: {
     body: z.object({
-      targetMemoryId: z.string().uuid('Invalid target memory ID'),
+      targetMemory: z.object({
+        description: z.string().min(1).max(2000),
+        negativeCognition: z.string().min(1).max(500),
+        positiveCognition: z.string().min(1).max(500),
+        emotion: z.string().min(1).max(200),
+        bodyLocation: z.string().max(200).optional(),
+      }).optional(),
+      targetMemoryId: z.string().uuid('Invalid target memory ID').optional(),
       initialSUD: commonSchemas.sudLevel,
       initialVOC: commonSchemas.vocLevel,
       preparationNotes: commonSchemas.notes
-    })
+    }).refine(
+      (data) => data.targetMemoryId || data.targetMemory,
+      { message: 'Either targetMemoryId or targetMemory must be provided' }
+    )
   },
 
   startSet: {
     body: z.object({
       stimulationSettings: z.object({
-        type: commonSchemas.stimulationType,
+        type: z.preprocess(
+          (val) => (typeof val === 'string' ? val.toUpperCase() : val),
+          commonSchemas.stimulationType
+        ),
         speed: z.number().min(0.1).max(3.0),
         intensity: z.number().min(0.1).max(1.0),
-        duration: z.number().min(10).max(300) // 10 seconds to 5 minutes
-      })
-    })
+        duration: z.number().min(10).max(300)
+      }).optional()
+    }).optional().default({})
   },
 
   endSet: {
@@ -432,7 +445,10 @@ export const validationSchemas = {
 
   updatePhase: {
     body: z.object({
-      phase: z.enum(['PREPARATION', 'ASSESSMENT', 'DESENSITIZATION', 'INSTALLATION', 'BODY_SCAN', 'CLOSURE', 'REEVALUATION']),
+      phase: z.preprocess(
+        (val) => (typeof val === 'string' ? val.toUpperCase() : val),
+        z.enum(['PREPARATION', 'ASSESSMENT', 'DESENSITIZATION', 'INSTALLATION', 'BODY_SCAN', 'CLOSURE', 'REEVALUATION'])
+      ),
       phaseData: z.record(z.any()).optional()
     })
   },
@@ -462,7 +478,10 @@ export const validationSchemas = {
     body: z.object({
       password: z.string().min(1, 'Password is required for account deletion')
     })
-  }
+  },
+
+  completeSession: z.object({ notes: z.string().max(2000).trim().optional() }),
+  emergencyStop: z.object({ reason: z.string().max(500).optional() }),
 };
 
 /**
